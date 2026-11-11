@@ -304,7 +304,7 @@ func (t *Tuner) Tune(freqMHz int) error {
 	}
 	var e errs
 	fmt.Fprintf(t.Log, "freq = %d\n", freqMHz)
-	code := uint16(freqMHz * 64) // 1/64 MHz 単位
+	code := uint16(freqMHz * 64)            // 1/64 MHz 単位
 	const xpidMin, xpidMax = 0x1fff, 0x1fff // ヌルパケットだけ捨てる
 
 	// 選局の前の復調部の設定

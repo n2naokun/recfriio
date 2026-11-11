@@ -4,7 +4,10 @@
 package main
 
 import (
+	"fmt"
 	"io"
+
+	"github.com/waya0125/recut100b/internal/pcsc"
 )
 
 type pcscReader interface {
@@ -13,4 +16,11 @@ type pcscReader interface {
 	io.Closer
 }
 
-func openPCSC(log io.Writer) (pcscReader, error) { return nil, errNoPCSC }
+func openPCSC(log io.Writer) (pcscReader, error) {
+	r, err := pcsc.Open()
+	if err != nil {
+		return nil, err
+	}
+	fmt.Fprintf(log, "B-CAS: PC/SC reader %q (%s)\n", r.Name, pcsc.Socket())
+	return r, nil
+}

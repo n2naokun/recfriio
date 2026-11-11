@@ -5,7 +5,6 @@ package main
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -38,7 +37,6 @@ func newDecoder(o *options, dev *ut100b.Device, log io.Writer) (b25Decoder, erro
 		}
 		d.closers = append(d.closers, reader)
 		transport = reader
-		fmt.Fprintln(log, "B-CAS: PC/SC reader")
 	} else {
 		fmt.Fprintln(log, "B-CAS: built-in slot of the tuner")
 		reader := asie5606.NewReader(dev.Bridge, dev.Tuner.CardAddr)
@@ -85,5 +83,3 @@ func (l *loggingTransport) Transmit(apdu []byte) ([]byte, error) {
 	fmt.Fprintf(l.w, "> %s\n< %s\n", hex.EncodeToString(apdu), hex.EncodeToString(r))
 	return r, nil
 }
-
-var errNoPCSC = errors.New("--pcsc はまだ使えない")

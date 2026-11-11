@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/waya0125/recut100b/internal/firmware"
 	"github.com/waya0125/recut100b/internal/ut100b"
 )
 
@@ -49,6 +50,7 @@ type options struct {
 	device   string
 	raw      string
 	cardLog  string
+	firmware string
 	channel  int
 	catv     bool
 	seconds  int // 0 なら止められるまで
@@ -71,6 +73,7 @@ func parseArgs(args []string, stderr io.Writer) (*options, error) {
 	fs.BoolVar(&o.strip, "strip", false, "ヌルパケットを捨てる（UT100B はもともと出さない）")
 	fs.BoolVar(&o.sync, "sync", false, "--b25 で、鍵がそろうまでの失敗を待つ")
 	fs.StringVar(&o.device, "device", "", "使う UT100B の機器ファイル（/dev/bus/usb/BBB/DDD）。空なら空いているもの")
+	fs.StringVar(&o.firmware, "firmware", "", "ファームの無い UT100B（1738:5211）しか無ければ、このファームを送ってから使う")
 	fs.StringVar(&o.raw, "raw", "", "B25 を通す前の TS も書き出す（照合用）")
 	fs.StringVar(&o.cardLog, "card-log", "", "B-CAS カードとのやり取りを書き出す（照合用。鍵が入るので人に渡さない）")
 	if err := fs.Parse(args); err != nil {
@@ -122,6 +125,12 @@ func main() {
 
 func run(o *options, log io.Writer) error {
 	dev, err := ut100b.OpenDevice(o.device)
+	if errors.Is(err, ut100b.ErrNoDevice) && o.firmware != "" && o.device == "" {
+		if lerr := loadFirmware(o.firmware, log); lerr != nil {
+			return lerr
+		}
+		dev, err = ut100b.OpenDevice("")
+	}
 	if err != nil {
 		return err
 	}
@@ -278,6 +287,24 @@ loop:
 	if cnr, raw, err := dev.Tuner.CNR(); err == nil {
 		fmt.Fprintf(log, "CNR: %.4f dB (raw %#x)\n", cnr, raw)
 	}
+	return nil
+}
+
+func loadFirmware(path string, log io.Writer) error {
+	image, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	index, ok := firmware.IndexFor(image)
+	if !ok {
+		return fmt.Errorf("%s は知らないファーム（ut100b-firmware load --index で送る）", path)
+	}
+	fmt.Fprintf(log, "loading the firmware %s...\n", path)
+	dev, err := firmware.Load(image, index, ut100b.ColdID, ut100b.WarmID, 5*time.Second)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(log, "the firmware is running: %s\n", dev)
 	return nil
 }
 
