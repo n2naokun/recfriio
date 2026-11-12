@@ -72,7 +72,7 @@ const (
 	card04       = 0x04 // 意味は未確認（閉じるときに 0）
 	cardTSMode   = 0x05 // TS のスクランブルの方式: 0x91 = XOR、0x80 = DES
 	cardIdentity = 0x09 // 下位 3 ビットが 6 なら DES の版
-	cardTSKey    = 0x10 // 0x10..0x1f。普通の書き込みでは効かない（coax による）
+	cardTSKey    = 0x10 // 0x10..0x1f。鍵は守られた書き込みでしか変わらないが、普通の書き込みも TS を出すのに要る
 	card80       = 0x80 // 意味は未確認（閉じるときに 0）
 )
 
@@ -257,7 +257,8 @@ func (t *Tuner) Open() error {
 	}
 	t.wait(30)
 
-	// TS のスクランブルの方式と鍵（鍵は 0。この書き方では効いていない）
+	// TS のスクランブルの方式と、0x10..0x1f への 0 の書き込み。
+	// この普通の書き込みでは鍵は変わらないが、無いと TS が出てこない（docs/QRS-UT100B.md）
 	t.regWrite(&e, t.CardAddr, cardTSMode, tsMode)
 	for reg := uint8(cardTSKey); reg < cardTSKey+0x10; reg++ {
 		t.regWrite(&e, t.CardAddr, reg, 0x00)
