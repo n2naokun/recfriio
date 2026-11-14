@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// 実機で受けたヌルパケット（PID 0x1fff、中身は全部 0xff のはず）のスクランブル後の 184 バイト
+// 実機で受けたヌルパケット（PID 0x1fff、中身は全部 0xff のはず）の、ASIE5606 の DES がかかった 184 バイト
 var nullPayload = []byte{
 	0x4e, 0x8c, 0x28, 0x31, 0x35, 0x43, 0xbf, 0x56, 0x4e, 0x8c, 0x28, 0x31, 0x35, 0x43, 0xbf, 0x56,
 	0x4e, 0x8c, 0x28, 0x31, 0x35, 0x43, 0xbf, 0x56, 0x4e, 0x8c, 0x28, 0x31, 0x35, 0x43, 0xbf, 0x56,
@@ -43,7 +43,7 @@ var oldDecryptOutput = []byte{
 func TestNullPacketFromTheTuner(t *testing.T) {
 	in := append([]byte{0x47, 0x1f, 0xff, 0x10}, nullPayload...)
 	out := make([]byte, PacketSize)
-	NewDescrambler().Packet(out, in)
+	NewStreamCipher().DecryptPacket(out, in)
 	if !bytes.Equal(out[:4], in[:4]) {
 		t.Fatalf("ヘッダーが変わった: % x", out[:4])
 	}
@@ -61,22 +61,22 @@ func TestSameAsOldDecrypt(t *testing.T) {
 	}
 	in[0] = 0x47
 	out := make([]byte, PacketSize)
-	d := NewDescrambler()
-	d.Packet(out, in)
+	d := NewStreamCipher()
+	d.DecryptPacket(out, in)
 	if !bytes.Equal(out, oldDecryptOutput) {
 		t.Fatalf("昔の decrypt.c と違う")
 	}
-	d.Packet(in, in) // その場で解いても同じ
+	d.DecryptPacket(in, in) // その場で解いても同じ
 	if !bytes.Equal(in, oldDecryptOutput) {
 		t.Fatalf("その場で解くと違う")
 	}
 }
 
-func BenchmarkPacket(b *testing.B) {
-	d := NewDescrambler()
+func BenchmarkDecryptPacket(b *testing.B) {
+	d := NewStreamCipher()
 	p := make([]byte, PacketSize)
 	b.SetBytes(PacketSize)
 	for b.Loop() {
-		d.Packet(p, p)
+		d.DecryptPacket(p, p)
 	}
 }

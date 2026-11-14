@@ -31,7 +31,7 @@
 //
 //	ASV5211（USB ブリッジ） ── I2C ─┬─ 0x20: 復調部（TC90522 の地上波側と同じレジスタの並び）
 //	                                │         └ 中継レジスタ 0xfe ─ 0xc0: チューナー（型番不明。NM120 ではない）
-//	                                └─ 0x4a / 0x5a: ASIE5606（B-CAS カードの IC。TS のスクランブルも受け持つ）
+//	                                └─ 0x4a / 0x5a: ASIE5606（B-CAS カードの IC。USB 転送の TS に DES もかける）
 //
 // 調べた結果は docs/QRS-UT100B.md。
 package ut100b
@@ -70,7 +70,7 @@ const (
 const (
 	cardCtrl     = 0x00
 	card04       = 0x04 // 意味は未確認（閉じるときに 0）
-	cardTSMode   = 0x05 // TS のスクランブルの方式: 0x91 = XOR、0x80 = DES
+	cardTSMode   = 0x05 // USB 転送の TS にかける暗号の方式: 0x91 = XOR、0x80 = DES
 	cardIdentity = 0x09 // 下位 3 ビットが 6 なら DES の版
 	cardTSKey    = 0x10 // 0x10..0x1f。鍵は守られた書き込みでしか変わらないが、普通の書き込みも TS を出すのに要る
 	card80       = 0x80 // 意味は未確認（閉じるときに 0）
@@ -257,7 +257,7 @@ func (t *Tuner) Open() error {
 	}
 	t.wait(30)
 
-	// TS のスクランブルの方式と、0x10..0x1f への 0 の書き込み。
+	// USB 転送の TS にかける暗号の方式と、0x10..0x1f への 0 の書き込み。
 	// この普通の書き込みでは鍵は変わらないが、無いと TS が出てこない（docs/QRS-UT100B.md）
 	t.regWrite(&e, t.CardAddr, cardTSMode, tsMode)
 	for reg := uint8(cardTSKey); reg < cardTSKey+0x10; reg++ {
@@ -269,7 +269,7 @@ func (t *Tuner) Open() error {
 	}
 	if tsMode != 0x80 {
 		fmt.Fprintln(t.Log, "failed.")
-		return errors.New("ASIE5606 が DES の版ではない（この版のスクランブルは扱えない）")
+		return errors.New("ASIE5606 が DES の版ではない（この版の USB 転送の暗号は扱えない）")
 	}
 	t.open = true
 	fmt.Fprintln(t.Log, "done.")

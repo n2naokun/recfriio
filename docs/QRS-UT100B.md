@@ -7,7 +7,7 @@
 | recfriio | recut100b |
 |---|---|
 | `recfriior5/Hdp.cpp`（初期化・選局・C/N・区切り合わせ） | `internal/ut100b/tuner.go`・`stream.go` |
-| `recfriior5/AsieDescrambler.cpp`（以前の `decrypt.c`） | `internal/asie5606/descramble.go`（Go の `crypto/des`） |
+| `recfriior5/AsieStreamCipher.cpp`（以前の `AsieDescrambler.cpp`、`decrypt.c`） | `internal/asie5606/stream_cipher.go`（Go の `crypto/des`） |
 | `recfriior5/AsieCardReader.cpp` | `internal/asie5606/card.go` |
 | `arib25/`（B25・MULTI2・B-CAS の命令） | `internal/b25/`・`internal/multi2/`・`internal/bcas/` |
 | `tools/ut100b-firmware.py` | `cmd/ut100b-firmware`・`internal/firmware/` |
@@ -24,7 +24,7 @@ Quixun QRS-UT100B は、地上デジタルテレビ放送用の USB チューナ
 |---|---|---|---|
 | 製品の系統 | SKNET MonsterTV HDUS 系の OEM 品 | 推定 | 価格.com の分解写真の基板に「SKNET」の文字があるという書き込み、付属品・リモコンが同じという報告。USB の流れ（`1738:5211` → ファーム → 起動）も HDUS と同じ |
 | USB ブリッジ | ASICEN **ASV5211**（8051 系のマイコン入り） | 確実 | ファームの無い状態の USB ID `1738:5211`、ブートROMへのファーム転送の手順が ASV5211 のもの |
-| カード・スクランブルの IC | ASICEN **ASIE5606**（B 版、`0x09` の値 `0x06`、I2C `0x4a`） | 確実 | `0x09` の応答と、B-CAS の ATR・APDU が通ること |
+| カードと USB 転送の暗号の IC | ASICEN **ASIE5606**（B 版、`0x09` の値 `0x06`、I2C `0x4a`） | 確実 | `0x09` の応答と、B-CAS の ATR・APDU が通ること |
 | チューナー | ソニーのチューナーモジュール **BTD-VK482Z**（8-597-642-00）。中の IC の型番は不明 | 推定 | HDUS の基板写真（ASCII.jp）。UT100B 自身の刻印は見ていない |
 | 復調部 | 東芝 **TC9050x / TC9051x 系**（TC90522 の地上波側と同じレジスタの並び）。モジュールの中にあると見られる | 推定（系統は実測） | C/N のレジスタ `0x8b`〜`0x8d` を Linux の tc90522 と同じ式で換算すると、もっともらしい値（受かる局で約 32 dB、空きで 0）。HDUS の写真では東芝のチップがカバーの外に見えない |
 | チューナーの IC | ソニー製のシリコンチューナー（型番は不明。2008 年の地デジ用のソニーの IC では CXA3746 があるが、裏付けなし） | 推定 | ASCII.jp の記事の「チューナーはソニー製」。NM120 ではない（NM120 は coax では `0xce`・16 ビットのレジスタ。こちらは `0xc0`・8 ビット） |
@@ -139,13 +139,19 @@ UT100B のビットレートが低く見えるのは、TS フィルターでヌ�
 
 ---
 
-## TS のスクランブル（2026-11-11 の調べ）
-UT100B の TS は、ASIE5606 を通るときにスクランブルがかかり、ソフト（`recfriior5/AsieDescrambler.cpp`、以前は `decrypt.c`）で元に戻している。
+## ASIE5606 の USB 転送の暗号（2026-11-11 の調べ）
+UT100B の TS は、復調器から ASIE5606 を通ってブリッジ（ASV5211）に届くとき、ASIE5606 で DES がかかる。  
+ソフト（`recfriior5/AsieStreamCipher.cpp`、Go 版は `internal/asie5606/stream_cipher.go`）で元に戻している。
 
+- **放送のスクランブル（ARIB STD-B25）とは別のもの。**  
+  この DES は、基板の中の IC どうしの転送にかかる暗号で、放送波にかかっているものではない。  
+  外したあとの TS は、放送のスクランブル（MULTI2）がかかったままの普通の TS になる。  
+  放送のスクランブルを外すのは `--b25` のときだけで（`arib25/`、Go 版は `internal/b25`）、ECM とワーク鍵の処理は B-CAS カードが受け持つ。  
+  以前はこの処理も「スクランブル外し」（`AsieDescrambler`、`descramble.go`）と呼んでいたが、B25 と紛らわしいので名前を変えた（2026-11-15）。
 - **止める設定は見つからなかった。**  
   ASIE5606 のレジスタ `0x05` は bit 7 が出力のスイッチで、0 にすると何も出てこない。  
   bit 4 を立てると同期が崩れる。  
-  ほかのビット（`0x81`〜`0x8f`、`0xa0`、`0xc0`、`0xe0` など）は、どれもスクランブルが残った。  
+  ほかのビット（`0x81`〜`0x8f`、`0xa0`、`0xc0`、`0xe0` など）は、どれも DES が残った。  
   coax が PLEX の同じ版（revision 0x03 = `0x09` の値 `0x06`）で使う `0x20` は、UT100B では出力が止まる。
 - **鍵は 0x10〜0x1f で決まる。**  
   普通の書き込みは効かないが、coax と同じ「守られた書き込み」（リクエスト `0x1a` で使い捨ての値をもらい、`0x1c` で書く）なら効く。  
@@ -163,7 +169,7 @@ UT100B の TS は、ASIE5606 を通るときにスクランブルがかかり、
   PLEX のファーム（b45d5102）を入れても、守られた書き込みのあと `0x05` が `0x20` なら出力が止まり、`0x80` 系なら DES が残った。  
   ブリッジのファームが外しているのではなく、基板が ASIE5606 のどの出力をつないでいるかの違いと考えている。
 - 調べるのに使った `RECFRIIO_USB_TRACE=1`（制御転送を全部記録する）は残してある。
-- `decrypt.c` は `AsieDescrambler.cpp` に置き換えた。  
+- `decrypt.c` は `AsieDescrambler.cpp`（今の `AsieStreamCipher.cpp`）に置き換えた。  
   DES の S 箱・置換は規格（FIPS 46-3）の値をそのまま書き、速さのための表と鍵スケジュールは、上の 2 つの鍵から起動時に組み立てる。  
   `make -C recfriior5 test` で、実機のヌルパケットと、置き換える前の `decrypt.c` の出力を答えに照合できる。
 

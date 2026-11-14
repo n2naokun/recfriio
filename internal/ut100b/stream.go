@@ -2,7 +2,7 @@
 //
 // 区切りの合わせ方（0x47 を探し、188・376 バイト先も 0x47 かを見る）は recfriio の Hdp::getStream
 // （recfriio: Copyright (c) 2008 FUKAUMI Naoki、2 条項 BSD。全文は tuner.go の頭）を Go に移したもの。
-// 受け始めの古いデータを捨てる処理と、ASIE5606 のスクランブル外しは KASHIWAYA Rikuto（2026、MIT）。
+// 受け始めの古いデータを捨てる処理と、ASIE5606 の USB 転送の DES を外す処理は KASHIWAYA Rikuto（2026、MIT）。
 
 package ut100b
 
@@ -19,11 +19,11 @@ const StaleDiscardBytes = 2 * 16384
 
 const packetSize = asie5606.PacketSize
 
-// Aligner は USB から届いたバイト列を 188 バイトのパケットに区切り、ASIE5606 のスクランブルを外す。
+// Aligner は USB から届いたバイト列を 188 バイトのパケットに区切り、ASIE5606 が USB 転送でかける DES を外す（B25 のスクランブルはそのまま）。
 type Aligner struct {
 	stale int
 	rest  []byte
-	d     *asie5606.Descrambler
+	d     *asie5606.StreamCipher
 	// Log に再同期の記録を書く
 	Log io.Writer
 	// Resyncs は再同期で読み飛ばした回数
@@ -32,10 +32,10 @@ type Aligner struct {
 
 // NewAligner は受け始めの StaleDiscardBytes を捨てる Aligner を作る。
 func NewAligner() *Aligner {
-	return &Aligner{stale: StaleDiscardBytes, d: asie5606.NewDescrambler(), Log: io.Discard}
+	return &Aligner{stale: StaleDiscardBytes, d: asie5606.NewStreamCipher(), Log: io.Discard}
 }
 
-// Feed は chunk を受け取り、スクランブルを外したパケットを返す（188 の倍数の長さ）。
+// Feed は chunk を受け取り、DES を外したパケットを返す（188 の倍数の長さ）。
 // 半端な残りは次の Feed まで持っておく。
 func (a *Aligner) Feed(chunk []byte) []byte {
 	if a.stale > 0 {
@@ -76,7 +76,7 @@ func (a *Aligner) Feed(chunk []byte) []byte {
 			break
 		}
 		out = out[:len(out)+packetSize]
-		a.d.Packet(out[len(out)-packetSize:], buf[pos:pos+packetSize])
+		a.d.DecryptPacket(out[len(out)-packetSize:], buf[pos:pos+packetSize])
 		pos += packetSize
 	}
 	a.rest = append(a.rest[:0:0], buf[pos:]...)

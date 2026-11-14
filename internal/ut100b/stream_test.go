@@ -37,7 +37,7 @@ func TestAlignerDropsStaleAndSplitsAnywhere(t *testing.T) {
 	}
 	want := make([]byte, len(body))
 	for i := 0; i < len(body); i += packetSize {
-		a.d.Packet(want[i:], body[i:i+packetSize])
+		a.d.DecryptPacket(want[i:], body[i:i+packetSize])
 	}
 	if !bytes.Equal(got, want) {
 		t.Fatal("中身が違う")

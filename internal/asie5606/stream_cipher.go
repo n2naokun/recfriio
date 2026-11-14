@@ -2,7 +2,7 @@
 // Copyright (c) 2026 KASHIWAYA Rikuto
 
 // Package asie5606 は ASICEN ASIE5606（QRS-UT100B の B-CAS カードの IC）を扱う。
-// TS のスクランブル外し（descramble.go）と、内蔵の B-CAS スロット（card.go）。
+// USB 転送の暗号を外す処理（stream_cipher.go）と、内蔵の B-CAS スロット（card.go）。
 package asie5606
 
 import (
@@ -10,7 +10,13 @@ import (
 	"crypto/des"
 )
 
-// ASIE5606 は USB に流す TS の各パケットにスクランブルをかける（DES の版。止められない）。
+// ASIE5606 は、復調器から受けた TS をブリッジ（ASV5211）へ渡すとき、各パケットに DES をかける。
+// これは基板の中の IC どうしの転送にかかる暗号で、放送の暗号（ARIB STD-B25、MULTI2）とは別のもの。
+// ここで外したあとの TS は、放送のスクランブルがかかったまま。
+// 放送のスクランブルを外すのは internal/b25 で、ECM とワーク鍵の処理は B-CAS カードが受け持つ。
+// レジスタの設定では止められなかった（docs/QRS-UT100B.md）。
+//
+// 外し方:
 //  1. 4 バイトのヘッダーはそのまま。
 //  2. 残りの 184 バイトに、8 バイト周期の値 whitening を XOR する。
 //  3. 先頭の 128 バイトを DES 鍵 keyHead で、残りの 56 バイトを DES 鍵 keyTail で、ECB で復号する。
@@ -26,13 +32,13 @@ var (
 // PacketSize は TS のパケットの大きさ。
 const PacketSize = 188
 
-// Descrambler は ASIE5606 のスクランブルを外す。
-type Descrambler struct {
+// StreamCipher は ASIE5606 が USB 転送でかける DES を外す。
+type StreamCipher struct {
 	head, tail cipher.Block
 }
 
-// NewDescrambler は Descrambler を作る。
-func NewDescrambler() *Descrambler {
+// NewStreamCipher は StreamCipher を作る。
+func NewStreamCipher() *StreamCipher {
 	head, err := des.NewCipher(keyHead)
 	if err != nil {
 		panic(err)
@@ -41,11 +47,12 @@ func NewDescrambler() *Descrambler {
 	if err != nil {
 		panic(err)
 	}
-	return &Descrambler{head: head, tail: tail}
+	return &StreamCipher{head: head, tail: tail}
 }
 
-// Packet は 188 バイトのパケット src のスクランブルを外して dst に書く（dst と src は同じでもよい）。
-func (d *Descrambler) Packet(dst, src []byte) {
+// DecryptPacket は 188 バイトのパケット src の DES を外して dst に書く（dst と src は同じでもよい）。
+// B25 のスクランブルはそのまま残る。
+func (d *StreamCipher) DecryptPacket(dst, src []byte) {
 	_ = dst[PacketSize-1]
 	_ = src[PacketSize-1]
 	var block [8]byte
