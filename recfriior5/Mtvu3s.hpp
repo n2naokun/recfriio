@@ -1,26 +1,28 @@
-// MonsterTV U3S (SK-MTVU3S, USB 3275:9015)
-
 #ifndef _MTVU3S_HPP_
 #define _MTVU3S_HPP_
 
 #include <vector>
+#include <cstdint>
 #include "AbstractFriio.hpp"
 #include "Aes128Ecb.hpp"
+#include "I2cBus.hpp"
+#include "Tc90522.hpp"
+#include "Qm1d1c0042.hpp"
+#include "Fc0013.hpp"
 
 /**
- * SKNET MonsterTV U3S 用チューナクラス
+ * SKNET MonsterTV U3S (USB 3275:9015, EM28178 + TC90522 x2 + QM1D1C0042 + FC0013)
  */
-class Mtvu3s : public AbstractFriio
-{
+class Mtvu3s : public AbstractFriio {
 public:
 	Mtvu3s();
 	virtual ~Mtvu3s();
 
 	virtual void setChannel(BandType band, int channel);
 	virtual const float getSignalLevel(void);
+	virtual int getStream(const uint8_t** bufp, int timeoutMsec);
 	virtual void startStream();
 	virtual void stopStream();
-	virtual int getStream(const uint8_t** bufp, int timeoutMsec);
 
 protected:
 	virtual bool is_friio(const std::string &devfile);
@@ -32,27 +34,32 @@ protected:
 	virtual void UsbProcFixInitB(int fd);
 
 private:
+	class Em28178I2cBus : public I2cBus {
+	public:
+		Em28178I2cBus() : fd(-1) {}
+		void setFd(int devFd) { fd = devFd; }
+		virtual void write(uint8_t addr, const uint8_t *data, uint16_t len, bool stop = true);
+		virtual void read(uint8_t addr, uint8_t *data, uint16_t len, bool stop = true);
+
+	private:
+		int fd;
+	};
+
 	BandType currentBand;
 	Aes128EcbDecryptor aes;
-	uint8_t qmRegs[32];
 	std::vector<uint8_t> packBuf;
 	std::vector<uint8_t> outBuf;
 	bool synced;
 
+	Em28178I2cBus i2cBus;
+	Tc90522 terDemod;
+	Tc90522 satDemod;
+	Fc0013 terTuner;
+	Qm1d1c0042 satTuner;
+
 	uint8_t emRegRead(int fd, uint8_t reg);
 	void emRegWrite(int fd, uint8_t reg, uint8_t val);
-	void i2cWrite(int fd, uint8_t addr, const uint8_t *data, uint16_t len, bool stop = true);
-	void i2cRead(int fd, uint8_t addr, uint8_t *data, uint16_t len, bool stop = true);
 
-	void demodWrite(int fd, uint8_t addr, uint8_t reg, uint8_t val);
-	void demodRead(int fd, uint8_t addr, uint8_t reg, uint8_t *buf, uint16_t len);
-	void tunerWrite(int fd, uint8_t demodAddr, uint8_t tunerAddr, const uint8_t *data, uint16_t len);
-	uint8_t tunerReadReg(int fd, uint8_t demodAddr, uint8_t tunerAddr, uint8_t reg);
-
-	void initDemods(int fd);
-	void initQm1d1c0042(int fd);
-	void initFc0013(int fd);
-	void adjustFc0013Lna(int fd);
 	void tuneSat(uint32_t freqKhz, uint16_t reqTsid);
 	void tuneTer(uint32_t freqKhz);
 };

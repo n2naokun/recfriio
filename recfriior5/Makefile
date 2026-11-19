@@ -15,7 +15,7 @@ ifdef B25
 endif
 
 ifdef HDUS
-  HDUS_OBJS = Hdus.o Hdp.o Mtvu3s.o AsieStreamCipher.o AsieCardReader.o
+  HDUS_OBJS = Hdus.o Hdp.o Mtvu3s.o Tc90522.o Qm1d1c0042.o Fc0013.o AsieStreamCipher.o AsieCardReader.o
 endif
 
 ifdef UDP
