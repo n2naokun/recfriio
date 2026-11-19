@@ -204,7 +204,8 @@ func (t *u3sTuner) CNR() (float64, uint32, error)       { return t.dev.CNR() }
 func (t *u3sTuner) StartStream() (*usbfs.Stream, error) { return t.dev.StartStream() }
 func (t *u3sTuner) StopStream(s *usbfs.Stream) error    { return t.dev.StopStream(s) }
 func (t *u3sTuner) BuiltinCard(io.Writer) bcas.Transport {
-	return nil // U3S には B-CAS のスロットが無い
+	// U3S にもスロットはあるが、カードの答えが EM28178 の中で変換されていてそのまま読めないので使わない（docs/SK-MTVU3S.md の 3 章）
+	return nil
 }
 func (t *u3sTuner) Close() error { return t.dev.Close() }
 

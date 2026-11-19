@@ -234,7 +234,7 @@ func (d *b25Decoder) Close() {
 	d.closers = nil
 }
 
-// newDecoder は B25 の復号器を作る。--pcsc か、内蔵のスロットが無い機種なら PC/SC のリーダーを使う。
+// newDecoder は B25 の復号器を作る。--pcsc か、内蔵のスロットを使えない機種（U3S）なら PC/SC のリーダーを使う。
 func newDecoder(o *options, t tuner, log io.Writer) (*b25Decoder, error) {
 	d := &b25Decoder{}
 	transport := t.BuiltinCard(log)

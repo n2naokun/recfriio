@@ -17,7 +17,7 @@
 | U3S を coax に足すときの残り | 触れていない | coax（11/16 の main）に、EM287x のブリッジ（isochronous 対応）・TC90522・QM1D1C0042 はもうある。EM287x と TC90522 の US-3POUT の基板が手本に近い。足りないのは次の 3 つ: ① FC0013 のドライバー（coax にあるのは FC0012） ② USB 転送の AES-128-ECB を外す処理 ③ U3S の基板（電源の手順と、2 つの TC90522 の切替） |
 | TS の転送 | バルク転送（3 章の注意点 3） | U3S は **isochronous**（EP `0x84`、altsetting 1、940 バイト × 16 / URB）。設計書の Rust 案の `nusb` は、文書に isochronous が無い（0.2.7 の時点。たぶん未対応）。なので Rust + `nusb` のままでは U3S を扱えない。coax は usbfs（Linux）と IOKit（macOS）に isochronous があるが、WinUSB の側には無い |
 | USB 転送の暗号 | UT100B の DES（2 章・3 章の注意点 2） | 機種ごとに違う。UT100B は DES と 2 つの鍵、U3S は **AES-128-ECB で鍵は全部 0**（ホストが EM28178 のレジスタ `0x60..0x6f` に書く）。U3S は各パケットの `[12..187]`（16 バイト × 11）だけを復号する。`0x5f` の暗号のビットを落とせば暗号自体を止められるかは、確かめていない |
-| 内蔵 B-CAS | UT100B の内蔵スロットで内部完結（3 章の注意点 4） | U3S には B-CAS のスロットが無い。U3S で復号するなら外付けのリーダー（PC/SC）が必要。「内部完結方式」は UT100B だけの話になる |
+| 内蔵 B-CAS | UT100B の内蔵スロットで内部完結（3 章の注意点 4） | U3S にもスロットはあるが、カードの答えが EM28178 の中で変換されていてそのまま読めない（2026-11-19）。U3S で復号するなら外付けのリーダー（PC/SC）が必要。「内部完結方式」は UT100B だけの話になる |
 | TS の同期 | 3 パケットの同期を確かめる | U3S も同じ作りで `sync_err=0`。機種によらない部品にしてよい |
 | 地デジの C/N | Hdp の式（Linux の tc90522 と同じ） | recfriio の `Tc90522.cpp`（U3S）は `10*log10(2^24/cndat)` で、Hdp の式と違う（たぶん誤り）。移すときは coax の `demod/tc90522/cnr.go` に揃える |
 | ライセンス | 触れていない | 11/19 に recfriior5 のファイルごとに SPDX を付けた。U3S の部分（`Mtvu3s`・`Tc90522`・`Fc0013`・`Qm1d1c0042`・`I2cBus`・`Aes128Ecb`）と `Asie*` は MIT（waya0125）なので、自由に移せる。`Hdp`・`Hdus` は BSD-2-Clause（FUKAUMI Naoki）なので、移すときは表示を残す。`Friio*` は BonDriver のライセンス（`licenses/LICENSE.bondriver`）。coax は Apache-2.0 OR GPL-2.0-or-later |
