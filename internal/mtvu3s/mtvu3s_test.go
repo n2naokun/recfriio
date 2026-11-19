@@ -24,8 +24,8 @@ func TestParseChannel(t *testing.T) {
 		{"BS01_0", BandBS, 1049480, 0x4010},
 		{"bs15_0", BandBS, 1049480 + 7*38360, 0x40f1}, // BS15 は 1 つずれる
 		{"BS23_2", BandBS, 1049480 + 11*38360, 0x4172},
-		{"CS2", BandCS, 1613000, 0},
-		{"CS24", BandCS, 1613000 + 11*40000, 0},
+		{"CS2", BandCS, 1613000, 0x6020},
+		{"CS24", BandCS, 1613000 + 11*40000, 0x7180},
 	}
 	for _, c := range cases {
 		got, err := ParseChannel(c.in)
@@ -149,5 +149,64 @@ func TestAESDescrambler(t *testing.T) {
 	d.DescramblePacket(enc)
 	if !bytes.Equal(enc, plain) {
 		t.Fatal("AES-128-ECB 復号結果が元のパケットと一致しない")
+	}
+}
+
+func TestMatchTSID(t *testing.T) {
+	// 2026-11-19 の BS23 の実機の一覧（スロット 0・1・3。登録年のビットがスロットごとに違う）
+	ids := []uint16{0x4770, 0x4971, 0x4973, 0xfff9}
+	cases := []struct {
+		want, got uint16
+		ok        bool
+	}{
+		{0x4770, 0x4770, true},  // そのまま
+		{0x4171, 0x4971, true},  // BS の登録年のビットを無視して当てる
+		{0x4172, 0x4172, false}, // BS23_2 はいま無い
+		{0x6020, 0x6020, false}, // CS は登録年を無視しない
+		{0, 0, true},
+	}
+	for _, c := range cases {
+		if got, ok := MatchTSID(c.want, ids); got != c.got || ok != c.ok {
+			t.Errorf("MatchTSID(%#04x) = %#04x, %v; want %#04x, %v", c.want, got, ok, c.got, c.ok)
+		}
+	}
+}
+
+func TestSettler(t *testing.T) {
+	s := &Settler{Clean: 3, MaxDrop: 100}
+	tei := func(cc uint8) []byte {
+		p := packet(0x100, cc)
+		p[1] |= 0x80
+		return p
+	}
+	var in []byte
+	in = append(in, tei(0)...)
+	in = append(in, packet(0x100, 1)...)
+	in = append(in, tei(2)...) // ここまで捨てる
+	in = append(in, packet(0x100, 3)...)
+	in = append(in, packet(0x100, 4)...)
+	out := s.Feed(in)
+	if out != nil || s.Settled() {
+		t.Fatalf("まだ流さないはず: %d バイト", len(out))
+	}
+	out = s.Feed(append(packet(0x100, 5), packet(0x100, 6)...))
+	if !s.Settled() || len(out) != 4*PacketSize || out[3]&0x0f != 3 {
+		t.Fatalf("settled=%v len=%d", s.Settled(), len(out))
+	}
+	if s.Dropped != 3 {
+		t.Fatalf("dropped=%d", s.Dropped)
+	}
+	// 落ち着いたあとは TEI が付いていても全部流す
+	if out := s.Feed(tei(7)); len(out) != PacketSize {
+		t.Fatal("落ち着いたあとに捨てている")
+	}
+
+	g := &Settler{Clean: 1000, MaxDrop: 4}
+	var bad []byte
+	for i := range 6 {
+		bad = append(bad, tei(uint8(i))...)
+	}
+	if out := g.Feed(bad); !g.GaveUp || len(out) != 2*PacketSize {
+		t.Fatalf("gaveup=%v len=%d", g.GaveUp, len(out))
 	}
 }

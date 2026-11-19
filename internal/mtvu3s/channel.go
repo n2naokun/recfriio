@@ -40,14 +40,51 @@ const (
 	csStepKHz  = 40000
 )
 
+// csTSIDs は 110 度 CS の各トランスポンダーの TSID（recgvmvp の internal/channel と同じ表）。
+// recfriio は CS で TSID を渡さず TMCC の最初のものを選んでいて、CS2 では 0xfff8 を選んでいた。
+var csTSIDs = map[int]uint16{
+	2: 0x6020, 4: 0x7040, 6: 0x7060, 8: 0x7080, 10: 0x70a0, 12: 0x70c0,
+	14: 0x70e0, 16: 0x7100, 18: 0x7120, 20: 0x7140, 22: 0x7160, 24: 0x7180,
+}
+
 // Channel は選局する先。
 type Channel struct {
 	Name    string
 	Band    Band
 	FreqKHz uint32
-	// TSID は衛星で選ぶ TS。0 なら TMCC にある最初のもの（CS はいつも 0）
+	// TSID は衛星で選ぶ TS。0 なら TMCC にある最初のもの。
+	// BS は recfriio と同じく登録年のビット（0x0e00）を 0 にして組み立てるので、
+	// 選ぶときに TMCC の一覧と突き合わせる（MatchTSID）。
 	TSID uint16
 }
+
+// bsYearMask は BS の TSID のうち、登録年のビット。
+const bsYearMask = 0x0e00
+
+// MatchTSID は、want に当たる TSID を TMCC の一覧 ids から選ぶ。
+// 同じものがあればそれ、BS なら登録年のビットを無視して同じものを返す。どちらも無ければ ok が false。
+// want が 0 なら（TS を選ばない）、0 と true。
+func MatchTSID(want uint16, ids []uint16) (id uint16, ok bool) {
+	if want == 0 {
+		return 0, true
+	}
+	for _, id := range ids {
+		if id == want {
+			return id, true
+		}
+	}
+	if want&0xf000 == 0x4000 {
+		for _, id := range ids {
+			if id&0xf000 == 0x4000 && id&^bsYearMask == want&^bsYearMask {
+				return id, true
+			}
+		}
+	}
+	return want, false
+}
+
+// IsTMCCPlaceholder は、TMCC の TSID の一覧で空きを表す値か（実機では 0xfff8・0xfff9 が見える）。
+func IsTMCCPlaceholder(id uint16) bool { return id >= 0xfff0 }
 
 // ParseChannel はチャンネルの書き方を読む（recfriio の --u3s と同じ）。
 //
@@ -86,6 +123,7 @@ func ParseChannel(s string) (Channel, error) {
 			Name:    fmt.Sprintf("CS%d", n),
 			Band:    BandCS,
 			FreqKHz: csBaseKHz + uint32(n/2-1)*csStepKHz,
+			TSID:    csTSIDs[n],
 		}, nil
 	}
 	n, err := strconv.Atoi(s)

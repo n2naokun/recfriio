@@ -247,7 +247,37 @@ func (d *Device) tuneSat(freqKHz uint32, tsid uint16) (TuneResult, error) {
 	if err != nil {
 		return TuneResult{}, err
 	}
-	selected, err := d.Sat.SelectSatTSID(tsid)
+	// TMCC がつかめた直後は、TSID の一覧がまだ埋まっていない（0xfff8 だけのことがある）ので、
+	// 空き以外が載るまで待つ
+	var ids []uint16
+	if _, err := i2c.WaitUntil(func() (bool, error) {
+		var err error
+		ids, err = d.Sat.SatTMCCTSIDs()
+		if err != nil {
+			return false, err
+		}
+		for _, id := range ids {
+			if !IsTMCCPlaceholder(id) {
+				return true, nil
+			}
+		}
+		return false, nil
+	}, tc90522.SatLockTries, tc90522.SatLockInterval); err != nil {
+		return TuneResult{}, err
+	}
+	want, ok := MatchTSID(tsid, ids)
+	fmt.Fprintf(d.Log, "ISDB-S TMCC TSIDs: %#04x (want %#04x -> %#04x)\n", ids, tsid, want)
+	if !ok {
+		// 無い TS を頼むと、復調部は黙って別の TS（一覧の最初など）を出すので、ここで止める
+		var have []uint16
+		for _, id := range ids {
+			if !IsTMCCPlaceholder(id) {
+				have = append(have, id)
+			}
+		}
+		return TuneResult{}, fmt.Errorf("TSID %#04x の TS は、いまこのトランスポンダーに無い（あるのは %#04x）", tsid, have)
+	}
+	selected, err := d.Sat.SelectSatTSID(want)
 	if err != nil {
 		return TuneResult{}, err
 	}

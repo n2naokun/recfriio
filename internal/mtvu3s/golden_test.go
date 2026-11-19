@@ -111,6 +111,7 @@ func TestI2CMatchesRecfriio(t *testing.T) {
 		c, err := ParseChannel(fmt.Sprintf("CS%d", n))
 		must(err)
 		fmt.Fprintf(&bus.out, "# CS %d\n", n)
+		c.TSID = 0 // recfriio は CS で TSID を渡さない
 		tuneSat(c)
 	}
 

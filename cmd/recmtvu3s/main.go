@@ -48,13 +48,16 @@ type options struct {
 	strip    bool
 	sync     bool
 	stats    bool
-	device   string
-	raw      string
-	cardLog  string
-	channel  mtvu3s.Channel
-	seconds  int // 0 なら止められるまで
-	output   string
-	exitCode int
+	noSettle bool
+	// noDescramble は USB 転送の暗号を外さずに書き出す（照合用）
+	noDescramble bool
+	device       string
+	raw          string
+	cardLog      string
+	channel      mtvu3s.Channel
+	seconds      int // 0 なら止められるまで
+	output       string
+	exitCode     int
 }
 
 func parseArgs(args []string, stderr io.Writer) (*options, error) {
@@ -71,6 +74,8 @@ func parseArgs(args []string, stderr io.Writer) (*options, error) {
 	fs.BoolVar(&o.strip, "strip", false, "ヌルパケットを捨てる")
 	fs.BoolVar(&o.sync, "sync", false, "--b25 で、鍵がそろうまでの失敗を待つ")
 	fs.BoolVar(&o.stats, "stats", false, "終わりに TS のヘッダーを数えた結果（同期・TEI・連続カウンター・PID）を書く")
+	fs.BoolVar(&o.noSettle, "no-settle", false, "受け始めの、復調部が落ち着く前のパケット（TEI 付き）も捨てずに書き出す")
+	fs.BoolVar(&o.noDescramble, "no-descramble", false, "EM28178 の USB 転送の暗号を外さずに書き出す（照合用。ペイロードは暗号がかかったまま）")
 	fs.StringVar(&o.device, "device", "", "使う U3S の機器ファイル（/dev/bus/usb/BBB/DDD）。空なら空いているもの")
 	fs.StringVar(&o.raw, "raw", "", "B25 を通す前の TS も書き出す（照合用）")
 	fs.StringVar(&o.cardLog, "card-log", "", "B-CAS カードとのやり取りを書き出す（照合用。鍵が入るので人に渡さない）")
@@ -191,11 +196,17 @@ func run(o *options, log io.Writer) error {
 	}
 	aligner := mtvu3s.NewAligner()
 	aligner.Log = log
-	descrambler, err := mtvu3s.NewDescrambler([16]byte{})
-	if err != nil {
-		return err
+	if !o.noDescramble {
+		descrambler, err := mtvu3s.NewDescrambler([16]byte{})
+		if err != nil {
+			return err
+		}
+		aligner.Descrambler = descrambler
 	}
-	aligner.Descrambler = descrambler
+	var settler *mtvu3s.Settler
+	if !o.noSettle {
+		settler = mtvu3s.NewSettler()
+	}
 	var stats *tscheck.Stats
 	if o.stats {
 		stats = tscheck.New()
@@ -225,6 +236,9 @@ loop:
 				break loop
 			}
 			packets := aligner.Feed(chunk)
+			if settler != nil {
+				packets = settler.Feed(packets)
+			}
 			if stats != nil {
 				stats.Add(packets)
 			}
@@ -269,6 +283,9 @@ loop:
 	if stream.Dropped > 0 || stream.Errors > 0 || stream.FrameErrors > 0 {
 		fmt.Fprintf(log, "USB: dropped %d chunks, %d failed transfers, %d failed frames (last: %v)\n",
 			stream.Dropped, stream.Errors, stream.FrameErrors, stream.LastError)
+	}
+	if settler != nil && (settler.Dropped > 0 || !settler.Settled() || settler.GaveUp) {
+		fmt.Fprintf(log, "settle: dropped %d packets at the start (settled=%v, gave up=%v)\n", settler.Dropped, settler.Settled(), settler.GaveUp)
 	}
 	if aligner.Resyncs > 0 || aligner.BadSync > 0 {
 		fmt.Fprintf(log, "TS: %d resyncs, %d packets without 0x47, %d bytes skipped\n", aligner.Resyncs, aligner.BadSync, aligner.Skipped)

@@ -200,6 +200,22 @@ func (d *Demod) SatSlotLocked() (bool, error) {
 	return v&satSlotLockMask != 0, err
 }
 
+// SatTMCCTSIDs は TMCC に載っている TSID の一覧を返す（0x0000・0xffff の空きは除く）。
+func (d *Demod) SatTMCCTSIDs() ([]uint16, error) {
+	var tmcc [satTMCCTSIDsCount * 2]byte
+	if err := d.ReadRegs(satTMCCTSIDs, tmcc[:]); err != nil {
+		return nil, err
+	}
+	var ids []uint16
+	for i := range satTMCCTSIDsCount {
+		id := uint16(tmcc[i*2])<<8 | uint16(tmcc[i*2+1])
+		if id != 0xffff && id != 0x0000 {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
 // SelectSatTSID は衛星の TS を TSID で選ぶ。tsid が 0 なら、TMCC にある最初の TSID を選ぶ。
 // 選んだ TSID を返す（選べなければ 0）。
 func (d *Demod) SelectSatTSID(tsid uint16) (uint16, error) {
