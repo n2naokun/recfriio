@@ -1,23 +1,19 @@
-# Licenses
+# ライセンス
 
-本リポジトリに含まれる各コンポーネントのライセンスは以下の通りです。
-それぞれの詳細な条項は `licenses/` ディレクトリ内の各ファイルをご確認ください。
+このリポジトリは、作者の違う部分を合わせたものです。
+ファイルごとの持ち主は、各ファイルの頭と下の表に書いてあります。
 
-1. **recfriio (本体、recfriior5/)**
-   - ファイルごとに先頭の `SPDX-License-Identifier` と `Copyright` の行に従います。
-   - USB の命令に関わる部分（AbstractFriio・Friio*）: BonDriver のライセンス (`licenses/LICENSE.bondriver`) と MIT License
-   - Hdus・Hdp: 2-Clause BSD License (`licenses/LICENSE.recfriio`、著作権者: FUKAUMI Naoki)
-   - tssplitter_lite: GPL-3.0-or-later（著作権者: querulous, Naoya OYAMA）
-   - それ以外: MIT License (`licenses/LICENSE.mit`)。元の作者が Public Domain として出した部分を含みます
+| 部分 | 持ち主 | ライセンス | 全文 |
+|---|---|---|---|
+| `internal/ut100b/tuner.go`・`stream.go` の、初期化・選局の手順と値、区切りの合わせ方 | recfriio: FUKAUMI Naoki（2008）。HDP・UT100B の対応は tslroom（2012）・stz2012（2016）による recfriio への追加 | 2 条項 BSD | `LICENSES/BSD-2-Clause-recfriio.txt` |
+| `internal/b25/`・`internal/multi2/`・`internal/bcas/`（arib25 の Go への移植） | arib25: 茂木 和洋（MOGI, Kazuhiro） | 免責に同意して作った二次的著作物について、原著作者は権利を行使しない | `LICENSES/arib25.txt` |
+| 上のほかの全部（移植で足した部分、usbfs・ASV5211・ASIE5606・MonsterTV U3S（EM28178・TC90522・FC0013・QM1D1C0042）・ファームの道具・コマンド・試験・`tools/`・`docs/`） | waya0125 | MIT | `LICENSES/MIT.txt` |
 
-2. **as11loader**
-   - 著作権者: FUKAUMI Naoki
-   - ライセンス: 2-Clause BSD License (`licenses/LICENSE.as11loader`)
+ASIE5606 の内蔵スロットの手順（`internal/asie5606/card.go`）は、coax（github.com/Till0196/coax、Apache-2.0 OR GPL-2.0-or-later）の
+`internal/coaxd/smartcard/asie5606` で調べられたものに従っています。
+コードは書き下ろしで、coax のコードは含みません。
 
-3. **arib25 (B25 復号ライブラリ)**
-   - 著作権者: 茂木 和洋 (MOGI, Kazuhiro)
-   - 条件: 免責条項同意による諸権利不行使 (`licenses/LICENSE.arib25`)
+メーカーのファームウェアは、このリポジトリに含みません。
 
-4. **追加ツール群・ドキュメント (tools/, firmware/load_firmware.sh, docs/)**
-   - 著作権者: waya0125
-   - ライセンス: MIT License (`licenses/LICENSE.mit`)
+C/C++ 版の recfriio（タグ `cpp-final`）のライセンスは、そのタグの `LICENSE` と `licenses/` を見てください。
+Go 版には、C/C++ 版の Friio（BonDriver 由来）・tssplitter_lite（GPL）・as11loader の部分は入っていません。

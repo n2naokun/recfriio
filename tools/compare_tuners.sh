@@ -53,8 +53,8 @@ echo "[2/3] Starting PT3 ($PT3_TUNER)..."
 docker exec -i coaxd timeout -s INT "$DURATION" coax tune --no-start --tuner "$PT3_TUNER" --ch "$CH" > "$DIR/pt3_${CH}.ts" 2>"$DIR/pt3.log" &
 PID_PT3=$!
 
-echo "[3/3] Starting QRS-UT100B (recfriio --hdp)..."
-"$HERE/../recfriior5/recfriio" --hdp "$CH" "$DURATION" "$DIR/ut100b_${CH}.ts" > "$DIR/ut100b.log" 2>&1 &
+echo "[3/3] Starting QRS-UT100B (recut100b)..."
+"$HERE/../bin/recut100b" "$CH" "$DURATION" "$DIR/ut100b_${CH}.ts" > "$DIR/ut100b.log" 2>&1 &
 PID_UT100B=$!
 
 echo "Recording in progress (waiting ${DURATION}s)..."

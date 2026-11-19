@@ -1,5 +1,19 @@
 # Quixun QRS-UT100B (ASICEN ASV5211 + ASIE5606) 動作仕様 & 検証レポート
 
+調べたのは C++ 版の recfriio を使っていたとき（タグ `cpp-final`）なので、文中のファイル名は C++ 版のものです。  
+いまの Go 版で同じことをしている場所は次のとおり。
+
+| C++ 版（`cpp-final`） | Go 版 |
+|---|---|
+| `recfriior5/Hdp.cpp`（初期化・選局・C/N・区切り合わせ） | `internal/ut100b/tuner.go`・`stream.go` |
+| `recfriior5/AsieStreamCipher.cpp`（以前の `AsieDescrambler.cpp`、`decrypt.c`） | `internal/asie5606/stream_cipher.go`（Go の `crypto/des`） |
+| `recfriior5/AsieCardReader.cpp` | `internal/asie5606/card.go` |
+| `arib25/`（B25・MULTI2・B-CAS の命令） | `internal/b25/`・`internal/multi2/`・`internal/bcas/` |
+| `tools/ut100b-firmware.py` | `cmd/ut100b-firmware`・`internal/firmware/` |
+| `RECFRIIO_USB_TRACE=1` | `RECUT100B_USB_TRACE=1` |
+| `make -C recfriior5 test` | `go test ./...` |
+| `recfriio --hdp --b25` | `recut100b --b25` |
+
 ## 1. 概要
 Quixun QRS-UT100B は、地上デジタルテレビ放送用の USB チューナーです。  
 ハードウェアの構成は次のとおり。  
@@ -49,8 +63,9 @@ UT100B は通電直後は ASICEN のコールドブート状態（VID: `1738`, P
 bit 6 の接続先は未確認。
 
 ```bash
-# 取り出しと転送（tools/ut100b-firmware.py を呼ぶ）
-./firmware/load_firmware.sh /path/to/CD/ROBRO_Origin/Driver/Quixun_AS11Loader.sys
+# 取り出しと転送
+ut100b-firmware extract /path/to/CD/ROBRO_Origin/Driver/Quixun_AS11Loader.sys -o asv5211-firmware.bin
+ut100b-firmware load asv5211-firmware.bin
 ```
 
 2026-11-11 に、表の主のファームウェア 2 つと PLEX のファームウェアを、それぞれ抜き差しのあとに `tools/ut100b-firmware.py load` で転送して確かめた。  
@@ -84,11 +99,7 @@ bit 6 の接続先は未確認。
 - **APDU 送受信**:
   - T=1 プロトコル準拠でコマンド送信後、カード ID（`90 30 00 00 00`）等を取得可能
 
-```bash
-# 内蔵 B-CAS リーダーのテストツール
-gcc -O2 tools/probe_bcas.c -o tools/probe_bcas
-sudo ./tools/probe_bcas
-```
+（recfriio には内蔵 B-CAS リーダーを試す `tools/probe_bcas.c` がある。この Go 版には持ってきていない）
 
 ---
 
@@ -118,10 +129,10 @@ UT100B のビットレートが低く見えるのは、TS フィルターでヌ�
 ---
 
 ## 5. 将来の近代化計画 (Roadmap)
-- [ ] **Go または Rust による完全リライト**:
-  - 2008 年の C/C++（Boost 1.74 依存等）からモダン言語へ刷新。
-  - **Go 案**: `Till0196/coax` に QRS-UT100B（`asv5211` + `asie5606`）のネイティブバックエンドとして統合。
-  - **Rust 案**: `rusb` を用いたクロスプラットフォーム CLI / デーモンとして再実装。
+- [x] **Go による書き直し**: このリポジトリ（recut100b、2026-11-11）。  
+  cgo・libusb・libpcsclite を使わない 1 つのバイナリ。
+- [ ] **coax への統合**: `Till0196/coax` に QRS-UT100B（`asv5211` + `asie5606`）のボードとして足す。  
+  このリポジトリの `internal/ut100b` と `testdata/usb-trace-hdp-ch19.txt` を元にする。
 - [ ] **Windows 版の現代化**:
   - レガシーな未署名 .sys ドライバ（XP/Vista 時代）に依存せず、WinUSB 直結で Windows 11 等でも署名問題なく直挿し動作可能にする。
 
@@ -129,13 +140,13 @@ UT100B のビットレートが低く見えるのは、TS フィルターでヌ�
 
 ## ASIE5606 の USB 転送の暗号（2026-11-11 の調べ）
 UT100B の TS は、復調器から ASIE5606 を通ってブリッジ（ASV5211）に届くとき、ASIE5606 で DES がかかる。  
-ソフト（`recfriior5/AsieStreamCipher.cpp`、以前は `AsieDescrambler.cpp`、`decrypt.c`）で元に戻している。
+ソフト（`recfriior5/AsieStreamCipher.cpp`、Go 版は `internal/asie5606/stream_cipher.go`）で元に戻している。
 
 - **放送のスクランブル（ARIB STD-B25）とは別のもの。**  
   この DES は、基板の中の IC どうしの転送にかかる暗号で、放送波にかかっているものではない。  
   外したあとの TS は、放送のスクランブル（MULTI2）がかかったままの普通の TS になる。  
-  放送のスクランブルを外すのは `--b25` のときだけで（`arib25/`）、ECM とワーク鍵の処理は B-CAS カードが受け持つ。  
-  以前はこの処理も「スクランブル外し」（`AsieDescrambler`）と呼んでいたが、B25 と紛らわしいので名前を変えた（2026-11-15）。
+  放送のスクランブルを外すのは `--b25` のときだけで（`arib25/`、Go 版は `internal/b25`）、ECM とワーク鍵の処理は B-CAS カードが受け持つ。  
+  以前はこの処理も「スクランブル外し」（`AsieDescrambler`、`descramble.go`）と呼んでいたが、B25 と紛らわしいので名前を変えた（2026-11-15）。
 - **止める設定は見つからなかった。**  
   ASIE5606 のレジスタ `0x05` は bit 7 が出力のスイッチで、0 にすると何も出てこない。  
   bit 4 を立てると同期が崩れる。  

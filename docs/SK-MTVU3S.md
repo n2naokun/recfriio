@@ -49,7 +49,21 @@ USB (EM28178, 3275:9015)
 
 ---
 
-## 3. ソース構成 (`recfriior5/`)
+## 3. ソース構成
+
+2026-11-19 に Go 版（`cmd/recmtvu3s`）へ置き換えました。下の表は C++ 版（タグ `cpp-final` の `recfriior5/`）のもので、Go 版の対応は次のとおりです。
+
+| C++ 版 | Go 版 |
+|---|---|
+| `Mtvu3s.cpp`（EM28178・選局・TS の区切り） | `internal/em28178/`・`internal/mtvu3s/` |
+| `Tc90522.cpp` | `internal/tc90522/` |
+| `Fc0013.cpp` | `internal/fc0013/` |
+| `Qm1d1c0042.cpp` | `internal/qm1d1c0042/` |
+| `I2cBus.hpp` | `internal/i2c/` |
+| `IoThread.cpp` の isochronous の URB | `internal/usbfs/stream.go`（`StartIsoStream`） |
+| `recfriio --u3s` | `recmtvu3s` |
+
+C++ 版のファイル:
 
 | ファイル | 役割 |
 |---|---|
