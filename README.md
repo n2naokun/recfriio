@@ -1,7 +1,7 @@
-# recfriio（QRS-UT100B 対応フォーク）
+# recfriio（QRS-UT100B / SK-MTVU3S 対応フォーク）
 
 Linux 環境向けの USB デジタルテレビチューナー録画プログラム `recfriio` のフォークです。  
-STZ 版（Friio・HDUS 系に対応）をもとに、**Quixun QRS-UT100B**（ASICEN ASV5211 + ASIE5606）を動かすための変更と、今の環境でビルドできるようにする変更を加えています。
+STZ 版（Friio・HDUS 系に対応）をもとに、**Quixun QRS-UT100B**（ASICEN ASV5211 + ASIE5606）と **SKNET MonsterTV U3S**（EM28178 + TC90522 x2 + FC0013 + QM1D1C0042）を動かすための変更と、今の環境でビルドできるようにする変更を加えています。
 
 ---
 
@@ -17,16 +17,21 @@ STZ 版（Friio・HDUS 系に対応）をもとに、**Quixun QRS-UT100B**（ASI
   - ASIE5606 が USB 転送で TS にかける暗号を外す処理（旧 `decrypt.c`、「似非 DES」。放送の B25 とは別のもの）を、規格どおりの DES と 2 つの鍵で書き直し（`make -C recfriior5 test` で照合できます）。
   - レジスタと命令に名前を付けました（`recfriior5/Hdp.cpp` の先頭）。
 - 詳しい仕様と調べた結果は [`docs/QRS-UT100B.md`](docs/QRS-UT100B.md) にあります。
+- **SKNET MonsterTV U3S への 3 波対応**（`--u3s` / `--mtvu3s`）:
+  - EM28178 Isochronous 転送（`EP 0x84`）および AES-128-ECB TS 復号に対応（`recfriior5/Aes128Ecb.hpp`）。
+  - 地デジ（`TC90522` + `FC0013`）と BS/CS（`TC90522` + `QM1D1C0042`）の 3 波受信に対応。
+  - 詳しい仕様と検証結果は [`docs/SK-MTVU3S.md`](docs/SK-MTVU3S.md) にあります。
 
 ---
 
 ## 動作確認済みデバイス
-**このフォークの今のコードで実機を確かめたのは、QRS-UT100B の 1 台だけです。**  
+**このフォークの今のコードで実機を確かめたのは、QRS-UT100B と SKNET MonsterTV U3S の 2 機種です。**  
 ほかの機種のコードは STZ 版から引き継いでいますが、ビルドが通ることしか確かめていません。
 
 | 製品名 | チップ | オプション | 今のコードでの確認 |
 |---|---|---|---|
 | **Quixun QRS-UT100B** | ASV5211 + ASIE5606 | `--hdp` | **確認済み**（下記） |
+| **SKNET MonsterTV U3S** | EM28178 + TC90522 x2 + FC0013 + QM1D1C0042 | `--u3s` / `--mtvu3s` | **確認済み**（3波受信・QRS-UT100B と同時録画確認、[`docs/SK-MTVU3S.md`](docs/SK-MTVU3S.md)） |
 | MonsterTV HDUC | ASV5211 | `--hdp` | 未確認（同じ `--hdp` の経路。実機なし） |
 | MonsterTV HDUS / HDUSF | ASV5211 + ASIE5606 | `--hdus` | 未確認（実機なし） |
 | Friio（白・黒） | Cypress FX2 | （なし） | 未確認（実機なし） |
@@ -54,7 +59,7 @@ QRS-UT100B で確かめたこと（2026-11-11、Ubuntu 26.04・カーネル 7.0.
 ### 必要パッケージ (Ubuntu / Debian)
 ```bash
 sudo apt update
-sudo apt install build-essential pkg-config libglib2.0-dev libpcsclite-dev
+sudo apt install build-essential pkg-config libpcsclite-dev
 ```
 
 ### ビルド手順
@@ -108,9 +113,14 @@ sudo ./tools/probe_bcas
 
 # 外付けのカードリーダー（PC/SC）で復号する場合
 ./recfriior5/recfriio --hdp --b25 --pcsc 19 30 nhk.ts
+
+# MonsterTV U3S で地デジ・BS・CS を録画する場合
+./recfriior5/recfriio --u3s 21 30 u3s_ter.ts
+./recfriior5/recfriio --u3s BS15_0 30 u3s_bs.ts
+./recfriior5/recfriio --u3s CS2 30 u3s_cs.ts
 ```
 
-`/dev/bus/usb` の権限が無い場合は root で実行するか、udev で `3275:7020` に権限を与えてください。
+`/dev/bus/usb` の権限が無い場合は root で実行するか、udev で `3275:7020`（QRS-UT100B）や `3275:9015`（MonsterTV U3S）に権限を与えてください。
 
 ### 4. 複数チューナー同時品質比較テスト
 `coaxd` で稼働中の PT3、torne、および QRS-UT100B を同一タイミングで録画し、TS パケット品質（同期エラー、TEI エラー、パケットドロップ、PCR Gaps）を自動測定・比較します：
@@ -135,6 +145,7 @@ sudo ./tools/compare_tuners.sh
 │   └── analyze_ts.py    # TS パケット精密解析スクリプト
 ├── docs/                # 詳細仕様書 & 原文ドキュメント
 │   ├── QRS-UT100B.md    # QRS-UT100B 動作仕様 & 品質レポート
+│   ├── SK-MTVU3S.md     # MonsterTV U3S 動作仕様 & 検証結果
 │   ├── modernization_design.md # 将来のRust統一モダナイズ詳細設計書
 │   └── original_readmes/# 過去バージョン (STZ版, HDUS, arib25) 原文 README
 └── licenses/            # 各コンポーネントのライセンスファイル

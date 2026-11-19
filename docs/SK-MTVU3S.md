@@ -1,0 +1,75 @@
+# SKNET MonsterTV U3S (SK-MTVU3S) 動作仕様 & 実装メモ
+
+SKNET MonsterTV U3S (`VID: 3275`, `PID: 9015`) を Linux (`recfriio --u3s` / `--mtvu3s`) で動作させるためのハードウェア構成・制御仕様・検証記録です。
+
+---
+
+## 1. ハードウェア構成
+
+| 役割 | チップ | アドレス / 備考 |
+|---|---|---|
+| USB ブリッジ | **EM28178** | USB 2.0 High-Speed、Isochronous EP `0x84` (`altsetting=1`, `940B x 16/URB`) |
+| 地上波復調 (ISDB-T) | **東芝 TC90522** | I2C `0x20` |
+| 地上波チューナー | **Fitipower FC0013** | `0x20` リピータ (`0xfe`) 経由 I2C `0xc6` (Chip ID `0xa3`, xtal `28.8 MHz`) |
+| 衛星復調 (ISDB-S) | **東芝 TC90522** | I2C `0x22` |
+| 衛星チューナー | **シャープ QM1D1C0042** | `0x22` リピータ (`0xfe`) 経由 I2C `0xc0` (xtal `16.0 MHz`) |
+
+```text
+USB (EM28178, 3275:9015)
+ ├── I2C 0x20: TC90522 (ISDB-T) ──[0xfe]──▶ 0xc6: FC0013 (UHF チューナー)
+ └── I2C 0x22: TC90522 (ISDB-S) ──[0xfe]──▶ 0xc0: QM1D1C0042 (BS/CS チューナー)
+```
+
+※ MonsterTV U3S には B-CAS スロットは無いため、復号 (`--b25`) を行う場合は外付けの PC/SC カードリーダー（`--pcsc` または環境変数等）を使用します。
+
+---
+
+## 2. 制御プロトコルの要点（`emOEM64.sys` / Windows キャプチャ解析）
+
+### EM28178 USB ベンダリクエスト・GPIO・暗号化
+- **ベンダリクエスト**:
+  - `0x00`: EM28178 レジスタ R/W
+  - `0x02`: I2C R/W (STOP あり)
+  - `0x03`: I2C R/W (STOP なし / Repeated Start)
+- **初期化と GPIO (`0x80`)**:
+  - `0x0c = 0x10`, `0x06 = 0x44`
+  - `0x80 = 0x7c` → 50ms 待ち → `0x80 = 0xfd`, `0x73 = 0xfd`（GPIO1=電源 Low ON、GPIO7=リセット Low→High パルス）
+- **TS ストリーミングと AES-128-ECB 復号**:
+  - 鍵レジスタ `0x60..0x6f` に 16 バイトの鍵（全 `0x00`）を書き込み、`0x5d = 0xef`, `0x5f = 0x89` で TS1 有効化＋同期＋暗号化有効にする。
+  - USB (`EP 0x84`) から受信した各 188 バイト TS パケットの `pkt[12..187]`（11 ブロック × 16 バイト）を AES-128-ECB で復号する（`Aes128Ecb.hpp`）。
+
+### TC90522 x2 と 2 チューナーの切替
+- 2 基の TC90522 が TS 出力バスを共有するため、使用しない側は TS ピンをトライステートかつスリープにする：
+  - **ISDB-T 使用時**: `0x22` 側 `0x1c=0x80, 0x1f=0x22`（トライステート）／`0x20` 側 `0x0e=0x01, 0x0f=0x77, 0x1d=0x00, 0x1f=0x00`、`em28xx 0x50 = 0x01`
+  - **ISDB-S 使用時**: `0x20` 側 `0x0e=0x77`（スリープ）, `0x1d=0xa8`（トライステート）／`0x22` 側 `0x1f=0x00, 0x1c=0x05`
+
+### 地デジ (`FC0013` + `TC90522 0x20`) 選局の重要ポイント
+- `FC0013` は Zero-IF チューナー（`xtal = 28.8 MHz`, `bw = 6 MHz`）。`emOEM64.sys` (`0x32c78` / `0x330e8` / `0x338de`) 準拠で PLL/VCO 分周とキャリブレーション (`0x0e = 0x80 -> 0x00`) を行い、`0x08 = 0x1f, 0x0c = 0xf8, 0x14 = 0x50` を設定する。
+- **選局前後の AGC 制御**: 選局前に `0x20[0x25] = 0x00`, `0x20[0x23] |= 0x01` を設定し、選局後に `0x20[0x23] &= ~0x01`, `0x20[0x25] = 0x80` へ戻してから `0x20[0x01] = 0x40` でリセットする。その後ロック待ちループ内で `Fc0013::adjustLna()` (`0x33c00` 準拠) を呼ぶ。
+
+---
+
+## 3. ソース構成 (`recfriior5/`)
+
+| ファイル | 役割 |
+|---|---|
+| `Mtvu3s.hpp` / `Mtvu3s.cpp` | `AbstractFriio` 実装、EM28178 制御、TS 同期・AES 復号、バンド/チャンネル切替 |
+| `I2cBus.hpp` | I2C バス抽象 (`I2cBus`)、`RegVal`、`waitUntil()` |
+| `Tc90522.hpp` / `Tc90522.cpp` | TC90522 復調器制御および `0xfe` リピータ I2C バス |
+| `Fc0013.hpp` / `Fc0013.cpp` | FC0013 (ISDB-T) 初期化・PLL/VCO 選局・LNA 調整 |
+| `Qm1d1c0042.hpp` / `Qm1d1c0042.cpp` | QM1D1C0042 (ISDB-S) 初期化・選局 |
+| `Aes128Ecb.hpp` | スタンドアロン AES-128-ECB 復号器 |
+
+---
+
+## 4. 実機検証結果 (2026-11-19)
+
+実機 (`Bus 003`, `3275:9015`) にてリファクタリング後のコードで以下を確認済み：
+
+| テスト項目 | 結果 |
+|---|---|
+| `make -C recfriior5 test` (`test_stream_cipher`) | 3 ケースすべて `ok` |
+| 地デジ `ch21` (`recfriio --u3s 21 2`) | `57,763 pkts`, `sync_err=0`, `tail20k_tei=0`, PAT CRC-32 OK `25`, `Signal level: 22.16 -> 34.03 dB` |
+| BS `BS15_0` (`recfriio --u3s BS15_0 2`) | `42,602 pkts`, `sync_err=0`, `tail20k_tei=0`, PAT CRC-32 OK `27`, `Signal level: 13.61 -> 13.54 dB` |
+| CS `CS2` (`recfriio --u3s CS2 2`) | `65,546 pkts`, `sync_err=0`, `tail20k_tei=0`, PAT CRC-32 OK `19`, `Signal level: 10.19 -> 10.39 dB` |
+| 2 台同時録画 (`--u3s BS15_0` + `--hdp 21`, 各 3 秒) | MonsterTV U3S (`55,830 pkts`) / QRS-UT100B (`40,436 pkts`) ともに `sync_err=0`, `tail20k_tei=0`, PAT CRC-32 OK 各 `35` |
