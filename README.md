@@ -10,6 +10,8 @@ cgo・libusb・libpcsclite を使わず、Linux の usbfs と pcscd に直接話
   カードは UT100B の内蔵スロットのものを使います（外付けのリーダーは `--pcsc`）。
 - 付属 CD のドライバーからファームを取り出して送る（`ut100b-firmware`）
 
+SKNET MonsterTV U3S（地デジ・BS・CS）用の `recmtvu3s` も入っています（下の「MonsterTV U3S」）。
+
 ## 動作確認
 
 | 機器 | 環境 | 結果 |
@@ -135,9 +137,9 @@ go test ./...
 実機での照合は `tools/arib25-compare/compare.sh` です。  
 `--raw` と `--card-log` で取った TS とカードの記録を、arib25（C）と Go で外して比べます。
 
-## MonsterTV U3S（`recmtvu3s`、作業中）
+## MonsterTV U3S（`recmtvu3s`）
 
-SKNET MonsterTV U3S（`3275:9015`、地デジ・BS・CS）用の `recmtvu3s` を、同じリポジトリに足しています（ブランチ `mtvu3s`）。  
+SKNET MonsterTV U3S（`3275:9015`、地デジ・BS・CS）用の `recmtvu3s` も、このリポジトリに入っています。  
 recfriio の `--u3s`（`Mtvu3s`・`Tc90522`・`Fc0013`・`Qm1d1c0042`）を Go に移したものです。
 
 ```bash
@@ -174,6 +176,16 @@ bin/recmtvu3s --stats CS2 30 out.ts      # 110 度 CS
 頭を捨てないときの TEI は全部、受け始めの 1 秒に固まっていました（ロックの直後で、復調部がまだ落ち着いていない）。  
 recfriio の確かめも末尾だけを数えていた（`tail20k_tei`）ので、たぶん同じことが起きています。  
 衛星の TS は、PAT の `transport_stream_id`（暗号のかかっていない 8〜9 バイト目）で確かめました（CS2 = `0x6020`、BS15_0 = `0x40f1`、BS01_0 = `0x4010`、BS23_1 = `0x4971`、BS23_3 = `0x4973`）。
+
+AES を外したあと（2026-11-19、3 秒ずつ）:
+
+| チャンネル | PAT の TSID | パケット | 同期の乱れ・TEI・連続カウンターの飛び | PAT の CRC-32 が合ったもの |
+|---|---|---|---|---|
+| 地デジ 21 | `0x7fe4` | 47,108 | 0 | 23 |
+| BS15_0 | `0x40f1` | 47,665 | 0 | 30 |
+| CS2 | `0x6020` | 103,978 | 0 | 30 |
+
+`--b25`（外付けのリーダー ACR39U、地デジ 21 で 5 秒）: 87,075 パケット、乱れ 0、スクランブルの残り 0、PAT の CRC-32 が合ったもの 44。
 
 ## 資料
 
