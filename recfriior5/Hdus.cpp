@@ -23,9 +23,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <glib.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 #include "usbops.hpp"
 #include "Hdus.hpp"
 #include "AsieStreamCipher.hpp"

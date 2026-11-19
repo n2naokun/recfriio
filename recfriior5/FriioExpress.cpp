@@ -1,7 +1,6 @@
 // $Id: FriioExpress.cpp 5689 2008-09-18 19:48:59Z clworld $
 // 凡Exp
 
-#include <glib.h>
 #include <math.h>
 #include <inttypes.h>
 #include "usbops.hpp"

@@ -131,6 +131,7 @@ struct Args {
 #ifdef HDUS
 	bool use_hdus;
 	bool use_hdp;
+	bool use_mtvu3s;
 #endif /* defined(HDUS) */
 	char* lockfile;
 	bool lnb;
@@ -167,7 +168,7 @@ parseChannel(Args* args, char* chstr)
 		case 'b':
 			if (chstr[1] == 'S' || chstr[1] == 's') {
 				int solt = 8;
-				args->type = TUNER_FRIIO_BLACK;
+				args->type = args->use_mtvu3s ? TUNER_MTVU3S : TUNER_FRIIO_BLACK;
 				args->band = BAND_BS;
 				chstr += 2;
 				while (isdigit( *chstr ))
@@ -188,7 +189,7 @@ parseChannel(Args* args, char* chstr)
 				// TSID合成(登録年情報欠落)
 				channel = 0x4000 | (channel << 4) | solt;
 			} else {
-				args->type = TUNER_FRIIO_BLACK;
+				args->type = args->use_mtvu3s ? TUNER_MTVU3S : TUNER_FRIIO_BLACK;
 				args->band = BAND_BS;
 				chstr++;
 				channel = atoi(chstr);
@@ -201,7 +202,7 @@ parseChannel(Args* args, char* chstr)
 		case 'C':
 		case 'c':
 			if (chstr[1] == 'S' || chstr[1] == 's') {
-				args->type = TUNER_FRIIO_BLACK;
+				args->type = args->use_mtvu3s ? TUNER_MTVU3S : TUNER_FRIIO_BLACK;
 				args->band = BAND_CS;
 				chstr += 2;
 				channel = atoi(chstr);
@@ -213,7 +214,7 @@ parseChannel(Args* args, char* chstr)
 				std::cerr << "channel must be (CS2 <= channel <= CS24)." << std::endl;
 				exit(1);
 			} else {
-				args->type = TUNER_FRIIO_BLACK;
+				args->type = args->use_mtvu3s ? TUNER_MTVU3S : TUNER_FRIIO_BLACK;
 				args->band = BAND_CS;
 				chstr++;
 				channel = atoi(chstr);
@@ -245,6 +246,8 @@ parseChannel(Args* args, char* chstr)
 				args->type = TUNER_HDUS;
 			else if( args->use_hdp )
 				args->type = TUNER_HDP;
+			else if( args->use_mtvu3s )
+				args->type = TUNER_MTVU3S;
 			else
 				args->type = TUNER_FRIIO_WHITE;
 #else
@@ -276,6 +279,7 @@ parseOption(int argc, char *argv[])
 		false,
 #endif /* defined(B25) */
 #ifdef HDUS
+		false,
 		false,
 		false,
 #endif /* defined(HDUS) */
@@ -318,6 +322,8 @@ parseOption(int argc, char *argv[])
 #ifdef HDUS
 			{ "hdus",     0, NULL, 'h' },
 			{ "hdp",      0, NULL, 'd' },
+			{ "u3s",      0, NULL, 'U' },
+			{ "mtvu3s",   0, NULL, 'U' },
 #endif /* defined(HDUS) */
 			{ "lockfile", 1, NULL, 'l' },
 			{ "lnb",      0, NULL, 'n' },
@@ -380,6 +386,9 @@ parseOption(int argc, char *argv[])
 				break;
 			case 'd':
 				args.use_hdp = true;
+				break;
+			case 'U':
+				args.use_mtvu3s = true;
 				break;
 #endif /* defined(HDUS) */
 			case 'l':

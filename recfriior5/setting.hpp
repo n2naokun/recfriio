@@ -18,8 +18,9 @@ const unsigned long ASYNCBUFFTIME = 20UL; // バッファ長 = 20秒
 const unsigned long WHITE_ASYNCBUFFSIZE = 0x200000UL * ASYNCBUFFTIME / TSDATASIZE; // 平均16Mbpsとする
 const unsigned long BLACK_ASYNCBUFFSIZE = 0x400000UL * ASYNCBUFFTIME / TSDATASIZE; // 平均32Mbpsとする
 #ifdef HDUS
-const unsigned long HDUS_ASYNCBUFFSIZE = WHITE_ASYNCBUFFSIZE;
-const unsigned long HDP_ASYNCBUFFSIZE  = WHITE_ASYNCBUFFSIZE;
+const unsigned long HDUS_ASYNCBUFFSIZE   = WHITE_ASYNCBUFFSIZE;
+const unsigned long HDP_ASYNCBUFFSIZE    = WHITE_ASYNCBUFFSIZE;
+const unsigned long MTVU3S_ASYNCBUFFSIZE = BLACK_ASYNCBUFFSIZE;
 #endif
 
 // 
@@ -32,6 +33,10 @@ const unsigned int HDUS_REQUEST_RESERVE_NUM  = 32;
 const unsigned int HDUS_REQUEST_POLLING_WAIT = 2;
 const unsigned int HDP_REQUEST_RESERVE_NUM   = 32;
 const unsigned int HDP_REQUEST_POLLING_WAIT  = 2;
+const unsigned int MTVU3S_REQUEST_RESERVE_NUM  = 32;
+const unsigned int MTVU3S_REQUEST_POLLING_WAIT = 2;
+const unsigned int MTVU3S_ISO_PACKET_SIZE      = 940;
+const unsigned int MTVU3S_ISO_PACKETS_PER_URB  = 16;
 // 開いた直後に捨てる量。前回の残りは見た限り 71 パケット（約 13 KB）以内だったので、余裕を見て 2 回分の転送。
 const size_t       HDP_STALE_DISCARD_BYTES   = 2 * 16384;
 #endif
@@ -50,6 +55,7 @@ const uint16_t TARGET_ID_PRODUCT_HDP  = 0x7010; // HDPのidProduct
 const uint16_t TARGET_ID_PRODUCT_UT100B = 0x7020; // QRS-UT100B / HDUCのidProduct
 const uint16_t TARGET_ID_PRODUCT_HDP2 = 0x6111; // HDP2のidProduct
 const uint16_t TARGET_ID_PRODUCT_FS100U = 0x6081; // LDT-FS100UのidProduct
+const uint16_t TARGET_ID_PRODUCT_MTVU3S = 0x9015; // MonsterTV U3SのidProduct
 #endif
 
 const uint32_t ERROR_RETRY_MAX      = 3;    // 初期化時にエラーが起こった場合のリトライ回数
@@ -63,7 +69,9 @@ const uint32_t SETCHANNEL_COMMAND_INTERBAL = 5; // SetChannel時Timeout error回
 
 const int TARGET_INTERFACE  = 0;
 const int TARGET_ALTSETTING = 0;
+const int TARGET_ALTSETTING_MTVU3S = 1;
 const int TARGET_ENDPOINT   = 0x81;
+const int TARGET_ENDPOINT_MTVU3S = 0x84;
 
 //
 const float SIGNALLEVEL_RETRY_THRESHOLD = 10.0; // 開始時の信号レベル取得で信号レベルがこれ以下であれば再度信号レベルを取得する。

@@ -6,11 +6,12 @@
 #include <errno.h>
 #include <err.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <sys/ioctl.h>
 
-#include <glib.h>
-
+#include <algorithm>
+#include <cstddef>
 #include <iostream>
 
 #include "usbops.hpp"
@@ -23,7 +24,7 @@ using namespace std;
  * 送信したURBをキャンセルする。
  */
 static void discard_async_request(AsyncRequest *r) {
-	int ret = usb_discardurb(r->fd, &(r->urb));
+	int ret = usb_discardurb(r->fd, r->urbPtr());
 	// EINVALは該当URBがkernel側のキューにない場合に返されるので無視で問題ない。
 	if (ret < 0 && errno != EINVAL) {
 		if (errno == EINVAL) {
@@ -51,21 +52,32 @@ PushIoThread::operator()() {
 		// リクエスト待ちに空きがある。
 		AsyncRequest *req          = buf->getPushPtr(REQUEST_TIMEOUT_TS, discard_async_request);
 		
-		memset(&(req->urb), '\0', sizeof(usbdevfs_urb));
-		memset(req->buf,    '\0', TSDATASIZE);
-		
-		req->urb.type              = USBDEVFS_URB_TYPE_BULK;
-		req->urb.endpoint          = endpoint;
-		req->urb.status            = 0;
-		req->urb.buffer            = req->buf;
-		req->urb.buffer_length     = TSDATASIZE;
-		req->urb.actual_length     = 0;
-		req->urb.number_of_packets = 0;
-		req->urb.signr             = 0;
-		req->urb.usercontext       = req;
+		memset(req->urb_storage, '\0', sizeof(req->urb_storage));
+		memset(req->buf, '\0', TSDATASIZE);
+
+		usbdevfs_urb *urb = req->urbPtr();
+		if (isoPacketSize > 0 && isoPacketsPerUrb > 0) {
+			urb->type              = USBDEVFS_URB_TYPE_ISO;
+			urb->flags             = USBDEVFS_URB_ISO_ASAP;
+			urb->buffer_length     = static_cast<int>(isoPacketSize * isoPacketsPerUrb);
+			urb->number_of_packets = static_cast<int>(isoPacketsPerUrb);
+			for (unsigned int i = 0; i < isoPacketsPerUrb; i++) {
+				urb->iso_frame_desc[i].length = isoPacketSize;
+			}
+		} else {
+			urb->type              = USBDEVFS_URB_TYPE_BULK;
+			urb->buffer_length     = TSDATASIZE;
+			urb->number_of_packets = 0;
+		}
+		urb->endpoint          = endpoint;
+		urb->status            = 0;
+		urb->buffer            = req->buf;
+		urb->actual_length     = 0;
+		urb->signr             = 0;
+		urb->usercontext       = req;
 		req->fd = fd;
 		
-		int r = usb_submiturb(fd, &(req->urb));
+		int r = usb_submiturb(fd, urb);
 		if (r < 0) {
 			err(1, "can't send urb");
 		}
@@ -118,7 +130,7 @@ PopIoThread::operator()() {
 		FD_ZERO(&writefds);
 		FD_SET(fd, &writefds);
 		
-		int maxfd = MAX(fd, event_fd_pop);
+		int maxfd = std::max(fd, event_fd_pop);
 		struct timeval tv = { 0, 5000 };
 		int r = select(maxfd+1, &readfds, &writefds, NULL, &tv);
 		if (r < 0) {

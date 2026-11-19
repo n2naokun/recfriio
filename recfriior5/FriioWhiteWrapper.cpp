@@ -1,7 +1,6 @@
 // $Id: FriioWhite.cpp 5689 2008-09-18 19:48:59Z clworld $
 // 白凡
 
-#include <glib.h>
 #include <math.h>
 #include "usbops.hpp"
 #include "FriioWhiteWrapper.hpp"

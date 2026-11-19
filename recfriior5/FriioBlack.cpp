@@ -1,9 +1,15 @@
 // $Id: FriioBlack.cpp 5689 2008-09-18 19:48:59Z clworld $
 // 黒凡
 
-#include <glib.h>
 #include <inttypes.h>
 #include <string.h>
+#include <unistd.h>
+#ifndef TRUE
+#define TRUE 1
+#endif
+#ifndef FALSE
+#define FALSE 0
+#endif
 #include "usbops.hpp"
 #include "FriioBlack.hpp"
 

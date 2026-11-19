@@ -31,6 +31,8 @@ protected:
 		asyncBufSize(WHITE_ASYNCBUFFSIZE),
 		requestReserveNum(WHITE_REQUEST_RESERVE_NUM),
 		requestPollingWait(WHITE_REQUEST_POLLING_WAIT),
+		isoPacketSize(0),
+		isoPacketsPerUrb(0),
 		isStream(false),
 		ringBuf(NULL),
 		push_func(NULL),
@@ -164,6 +166,12 @@ protected:
 	
 	/** REQUEST_POLLING_WAIT */
 	unsigned int requestPollingWait;
+
+	/** Isochronous 1パケットサイズ（0ならBulk） */
+	unsigned int isoPacketSize;
+
+	/** Isochronous 1URBあたりパケット数 */
+	unsigned int isoPacketsPerUrb;
 	
 	/** 使用可能な周波数帯域 */
 	std::vector<BandType> supportBands;

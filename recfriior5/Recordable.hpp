@@ -18,6 +18,7 @@ typedef enum {
 #ifdef HDUS
 	TUNER_HDUS,
 	TUNER_HDP,
+	TUNER_MTVU3S,
 #endif
 	TUNER_TYPES_LEN,
 } TunerType;

@@ -28,7 +28,7 @@ AbstractFriio::startStream()
 	
 	ringBuf = new RingBuf<AsyncRequest>(asyncBufSize);
 	
-	push_func = new PushIoThread(tunerFd, endpoint, requestReserveNum, requestPollingWait, ringBuf);
+	push_func = new PushIoThread(tunerFd, endpoint, requestReserveNum, requestPollingWait, ringBuf, isoPacketSize, isoPacketsPerUrb);
 	pop_func  = new PopIoThread(tunerFd, ringBuf);
 	
 	push_thread = new std::thread(std::ref(*push_func));
@@ -97,13 +97,13 @@ AbstractFriio::getStream(const uint8_t** bufp, int timeoutMsec)
 		return 0;
 	}
 	
-	if (req->urb.status != 0) {
+	if (req->urbPtr()->status != 0) {
 		std::ostringstream stream;
-		stream << "UrbStatus: " << req->urb.status;
+		stream << "UrbStatus: " << req->urbPtr()->status;
 		throw usb_error(stream.str());
 	}
 	
-	int rlen = req->urb.actual_length;
+	int rlen = req->urbPtr()->actual_length;
 	
 	*bufp = req->buf;
 	return rlen;

@@ -15,7 +15,7 @@ ifdef B25
 endif
 
 ifdef HDUS
-  HDUS_OBJS = Hdus.o Hdp.o AsieStreamCipher.o AsieCardReader.o
+  HDUS_OBJS = Hdus.o Hdp.o Mtvu3s.o AsieStreamCipher.o AsieCardReader.o
 endif
 
 ifdef UDP
@@ -33,9 +33,9 @@ DEPEND = Makefile.dep
 
 CC       = gcc
 CXX      = g++
-CXXFLAGS = -O2 -g -Wall -pthread -std=c++17 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 $(B25) $(HDUS) $(UDP) $(HTTP) $(TSSL) `pkg-config --cflags glib-2.0`
+CXXFLAGS = -O2 -g -Wall -pthread -std=c++17 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 $(B25) $(HDUS) $(UDP) $(HTTP) $(TSSL)
 LDFLAGS  = 
-LIBS     = -lpthread `pkg-config --libs glib-2.0`
+LIBS     = -lpthread
 
 all: $(TARGET)
 

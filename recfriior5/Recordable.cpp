@@ -8,6 +8,7 @@
 #ifdef HDUS
 #include "Hdus.hpp"
 #include "Hdp.hpp"
+#include "Mtvu3s.hpp"
 #endif
 
 const std::string tunerTypeName[TUNER_TYPES_LEN] = {
@@ -16,6 +17,7 @@ const std::string tunerTypeName[TUNER_TYPES_LEN] = {
 #ifdef HDUS
 	"HDUS",
 	"HDP",
+	"MonsterTV U3S",
 #endif
 };
 
@@ -34,6 +36,9 @@ createRecordable(TunerType type) {
 			break;
 		case TUNER_HDP:
 			return new Hdp();
+			break;
+		case TUNER_MTVU3S:
+			return new Mtvu3s();
 			break;
 #endif
 		default:

@@ -15,7 +15,10 @@
 struct AsyncRequest {
 	int fd;
 	uint8_t buf[TSDATASIZE];
-	usbdevfs_urb urb;
+	alignas(usbdevfs_urb) uint8_t urb_storage[sizeof(usbdevfs_urb) + sizeof(usbdevfs_iso_packet_desc) * MTVU3S_ISO_PACKETS_PER_URB];
+
+	usbdevfs_urb* urbPtr() { return reinterpret_cast<usbdevfs_urb*>(urb_storage); }
+	const usbdevfs_urb* urbPtr() const { return reinterpret_cast<const usbdevfs_urb*>(urb_storage); }
 };
 
 /**
@@ -36,12 +39,16 @@ public:
 		int endpoint,
 		unsigned int requestReserveNum,
 		unsigned int requestPollingWait,
-		RingBuf<AsyncRequest> *buf)
+		RingBuf<AsyncRequest> *buf,
+		unsigned int isoPacketSize = 0,
+		unsigned int isoPacketsPerUrb = 0)
 	 : fd(fd),
 	   endpoint(endpoint),
 	   requestReserveNum(requestReserveNum),
 	   requestPollingWait(requestPollingWait),
 	   buf(buf),
+	   isoPacketSize(isoPacketSize),
+	   isoPacketsPerUrb(isoPacketsPerUrb),
 	   is_cancelled(false) {
 	}
 	
@@ -67,6 +74,10 @@ protected:
 	unsigned int requestPollingWait;
 	/** リングバッファ */
 	RingBuf<AsyncRequest> *buf;
+	/** Isochronous 1パケットサイズ（0ならBulk） */
+	unsigned int isoPacketSize;
+	/** Isochronous 1URBあたりパケット数 */
+	unsigned int isoPacketsPerUrb;
 	/** 停止フラグon? */
 	bool is_cancelled;
 };
@@ -100,6 +111,10 @@ protected:
 	int fd;
 	/** リングバッファ */
 	RingBuf<AsyncRequest> *buf;
+	/** Isochronous 1パケットサイズ（0ならBulk） */
+	unsigned int isoPacketSize;
+	/** Isochronous 1URBあたりパケット数 */
+	unsigned int isoPacketsPerUrb;
 	/** 停止フラグon? */
 	bool is_cancelled;
 	/** select中断用pipe(in) */
