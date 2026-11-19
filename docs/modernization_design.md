@@ -1,7 +1,40 @@
 # QRS-UT100B Rust統一モダナイズ詳細設計書
 〜 Linux / Windows クロスプラットフォーム実装における差異と最重要注意点 〜
 
-## 0. 2026-11-11 時点の更新（この設計書を書いたあとに分かったこと）
+## 0. 2026-11-19 時点の更新（MonsterTV U3S に対応したあとに分かったこと）
+
+11/19 に recfriio で SKNET MonsterTV U3S（`3275:9015`）の地デジ・BS・CS が受かるようになった（`docs/SK-MTVU3S.md`）。  
+この設計書は UT100B の 1 機種だけを前提に書いているので、ずれた所をまとめる。  
+11/11 の更新（下の 0-1）も合わせて読む。
+
+### 変わった前提
+| 項目 | この設計書（と 11/11 の更新）での前提 | 分かったこと |
+|---|---|---|
+| 対象の機種 | UT100B だけ（クレート名も `ut100b-*`） | recfriio で実機を確かめたのは UT100B と U3S の 2 機種。U3S は作りがまったく違う（EM28178 + TC90522 x2 + FC0013 + QM1D1C0042、地デジ・BS・CS）。作り直すなら、機種の名前ではなくチップごとに分ける |
+| 新しい実装の行き先 | 「Go で coax に足すほうが作業は少ない見込み」 | そのとおり進んだ。coax に UT100B を足す PR（[Till0196/coax#13](https://github.com/Till0196/coax/pull/13)）を出していて、11/19 の時点でまだ開いている。recfriio の UT100B の部分を Go で書き直した recut100b もある |
+| U3S を coax に足すときの残り | 触れていない | coax（11/16 の main）に、EM287x のブリッジ（isochronous 対応）・TC90522・QM1D1C0042 はもうある。EM287x と TC90522 の US-3POUT の基板が手本に近い。足りないのは次の 3 つ: ① FC0013 のドライバー（coax にあるのは FC0012） ② USB 転送の AES-128-ECB を外す処理 ③ U3S の基板（電源の手順と、2 つの TC90522 の切替） |
+| TS の転送 | バルク転送（3 章の注意点 3） | U3S は **isochronous**（EP `0x84`、altsetting 1、940 バイト × 16 / URB）。設計書の Rust 案の `nusb` は、文書に isochronous が無い（0.2.7 の時点。たぶん未対応）。なので Rust + `nusb` のままでは U3S を扱えない。coax は usbfs（Linux）と IOKit（macOS）に isochronous があるが、WinUSB の側には無い |
+| USB 転送の暗号 | UT100B の DES（2 章・3 章の注意点 2） | 機種ごとに違う。UT100B は DES と 2 つの鍵、U3S は **AES-128-ECB で鍵は全部 0**（ホストが EM28178 のレジスタ `0x60..0x6f` に書く）。U3S は各パケットの `[12..187]`（16 バイト × 11）だけを復号する。`0x5f` の暗号のビットを落とせば暗号自体を止められるかは、確かめていない |
+| 内蔵 B-CAS | UT100B の内蔵スロットで内部完結（3 章の注意点 4） | U3S には B-CAS のスロットが無い。U3S で復号するなら外付けのリーダー（PC/SC）が必要。「内部完結方式」は UT100B だけの話になる |
+| TS の同期 | 3 パケットの同期を確かめる | U3S も同じ作りで `sync_err=0`。機種によらない部品にしてよい |
+| 地デジの C/N | Hdp の式（Linux の tc90522 と同じ） | recfriio の `Tc90522.cpp`（U3S）は `10*log10(2^24/cndat)` で、Hdp の式と違う（たぶん誤り）。移すときは coax の `demod/tc90522/cnr.go` に揃える |
+| ライセンス | 触れていない | 11/19 に recfriior5 のファイルごとに SPDX を付けた。U3S の部分（`Mtvu3s`・`Tc90522`・`Fc0013`・`Qm1d1c0042`・`I2cBus`・`Aes128Ecb`）と `Asie*` は MIT（waya0125）なので、自由に移せる。`Hdp`・`Hdus` は BSD-2-Clause（FUKAUMI Naoki）なので、移すときは表示を残す。`Friio*` は BonDriver のライセンス（`licenses/LICENSE.bondriver`）。coax は Apache-2.0 OR GPL-2.0-or-later |
+
+### 進め方に効くこと
+- **coax にまとめる道が、いちばん作業が少ない。**  
+  UT100B は PR #13 が通れば済む。  
+  U3S は上の ① 〜 ③ を足せばよい。  
+  recfriior5 は 11/19 にチップごとのファイル（`Tc90522`・`Fc0013`・`Qm1d1c0042`・`I2cBus`）に分けたので、そのまま移植元にしやすい。
+- **Rust で一から作る案は、ほぼ要らなくなった。**  
+  この案に残る意味は、Windows（WinUSB・BonDriver）まで 1 本にすることだった。  
+  ただ、coax にも WinUSB の側と BonDriver_coax がある。  
+  U3S を Windows で使うには、どちらの道でも WinUSB の isochronous（`WinUsb_ReadIsochPipe` など、Windows 8.1 から）を書く必要がある。
+- **移すときの物差し（USB の記録）は UT100B の分しかない。**  
+  `RECFRIIO_USB_TRACE=1` を見ているのは `Hdp.cpp` だけ。  
+  U3S を移す前に、`Mtvu3s` の制御転送も同じ形で記録できるようにして、ch21・BS15_0・CS2 の記録を `docs/reference/` に置いておくとよい。
+- U3S の確かめ方は `docs/SK-MTVU3S.md` の 4 章と同じ（`sync_err`・`tail20k_tei`・PAT の CRC-32）。
+
+## 0-1. 2026-11-11 時点の更新（この設計書を書いたあとに分かったこと）
 
 この設計書は、recfriio の UT100B 対応を詰める前に書いたもの。  
 そのあと実機と資料で分かったことで、前提がいくつか変わった。  
