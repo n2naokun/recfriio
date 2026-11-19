@@ -5,6 +5,7 @@ package mtvu3s
 
 import (
 	"bytes"
+	"crypto/aes"
 	"testing"
 
 	"github.com/waya0125/recut100b/internal/tc90522"
@@ -120,5 +121,33 @@ func TestCNR(t *testing.T) {
 	}
 	if got := tc90522.SatCNRFromRaw(2999); got != 0 {
 		t.Errorf("SatCNRFromRaw(2999) = %v", got)
+	}
+}
+
+func TestAESDescrambler(t *testing.T) {
+	var key [16]byte
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain := make([]byte, PacketSize)
+	for i := range plain {
+		plain[i] = byte(i)
+	}
+	plain[0] = 0x47
+
+	enc := append([]byte(nil), plain...)
+	for b := 0; b < tsAESBlocks; b++ {
+		off := tsAESOffset + b*aes.BlockSize
+		block.Encrypt(enc[off:off+aes.BlockSize], enc[off:off+aes.BlockSize])
+	}
+
+	d, err := NewDescrambler(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.DescramblePacket(enc)
+	if !bytes.Equal(enc, plain) {
+		t.Fatal("AES-128-ECB 復号結果が元のパケットと一致しない")
 	}
 }

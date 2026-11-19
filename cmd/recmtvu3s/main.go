@@ -191,6 +191,11 @@ func run(o *options, log io.Writer) error {
 	}
 	aligner := mtvu3s.NewAligner()
 	aligner.Log = log
+	descrambler, err := mtvu3s.NewDescrambler([16]byte{})
+	if err != nil {
+		return err
+	}
+	aligner.Descrambler = descrambler
 	var stats *tscheck.Stats
 	if o.stats {
 		stats = tscheck.New()

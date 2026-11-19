@@ -4,6 +4,8 @@
 package mtvu3s
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"fmt"
 	"io"
 )
@@ -11,13 +13,38 @@ import (
 // PacketSize は TS のパケットの大きさ。
 const PacketSize = 188
 
+const (
+	tsAESOffset = 12
+	tsAESBlocks = 11 // 11 * 16 = 176 バイト (packet[12..187])
+)
+
 // Descrambler は、EM28178 が USB 転送でかけた暗号を、188 バイトのパケット 1 つごとにその場で外す。
 // どこにどうかかっているかは recfriio の docs/SK-MTVU3S.md。
-//
-// この移植には中身を入れていない（メーカーの保護に当たるので、わやさんが入れる）。
-// Aligner.Descrambler が nil なら、届いたパケットをそのまま流す。
 type Descrambler interface {
 	DescramblePacket(packet []byte)
+}
+
+type aesDescrambler struct {
+	block cipher.Block
+}
+
+// NewDescrambler は 16 バイトの鍵を使って AES-128-ECB の Descrambler を作る。
+func NewDescrambler(key [16]byte) (Descrambler, error) {
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return nil, err
+	}
+	return &aesDescrambler{block: block}, nil
+}
+
+func (d *aesDescrambler) DescramblePacket(packet []byte) {
+	if len(packet) < PacketSize {
+		return
+	}
+	for b := 0; b < tsAESBlocks; b++ {
+		off := tsAESOffset + b*aes.BlockSize
+		d.block.Decrypt(packet[off:off+aes.BlockSize], packet[off:off+aes.BlockSize])
+	}
 }
 
 // Aligner は isochronous で届いたバイト列を 188 バイトのパケットに区切る（Mtvu3s::getStream と同じやり方）。
