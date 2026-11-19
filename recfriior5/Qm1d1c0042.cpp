@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 KASHIWAYA Rikuto
+
 #include <string.h>
 #include <unistd.h>
 #include "Qm1d1c0042.hpp"

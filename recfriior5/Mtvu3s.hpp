@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 KASHIWAYA Rikuto
+
 #ifndef _MTVU3S_HPP_
 #define _MTVU3S_HPP_
 

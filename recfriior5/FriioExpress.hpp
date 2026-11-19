@@ -1,3 +1,7 @@
+// Copyright (c) 2008 clworld
+// Copyright (c) recfriio FriioExpress patch contributors
+// Copyright (c) 2012 stz2012 (tslroom)
+
 // $Id$
 // 凡Exp
 

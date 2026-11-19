@@ -1,3 +1,6 @@
+// Copyright (c) 2008-2012 clworld
+// Copyright (c) 2026 KASHIWAYA Rikuto
+
 // $Id: usbops.cpp 10379 2012-02-16 17:51:49Z clworld $
 // USB操作
 

@@ -1,3 +1,7 @@
+// Copyright (c) 2008-2012 clworld
+// Copyright (c) 2012 stz2012 (tslroom)
+// Copyright (c) 2026 KASHIWAYA Rikuto
+
 // $Id: AbstractFriio.cpp 10379 2012-02-16 17:51:49Z clworld $
 // 白黒共通abstractクラス
 

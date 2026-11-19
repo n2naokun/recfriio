@@ -1,3 +1,9 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Copyright (c) 2008 FUKAUMI Naoki
+// Copyright (c) recfriio HDUS/HDP patch contributors
+// Copyright (c) 2016 stz2012 (tslroom)
+// Copyright (c) 2026 KASHIWAYA Rikuto
+
 /*-
  * Copyright (c) 2008 FUKAUMI Naoki.
  * All rights reserved.

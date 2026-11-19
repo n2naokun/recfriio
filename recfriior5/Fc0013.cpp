@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 KASHIWAYA Rikuto
+
 #include <unistd.h>
 #include "Fc0013.hpp"
 

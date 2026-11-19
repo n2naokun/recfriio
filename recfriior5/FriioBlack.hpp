@@ -1,3 +1,6 @@
+// Copyright (c) 2008 clworld
+// Copyright (c) 2012 stz2012 (tslroom)
+
 // $Id$
 // 黒凡
 

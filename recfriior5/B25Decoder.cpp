@@ -1,3 +1,6 @@
+// Copyright (c) 2008 clworld
+// Copyright (c) 2026 KASHIWAYA Rikuto
+
 // $Id: B25Decoder.cpp 5663 2008-09-15 17:53:59Z clworld $
 // arib25
 

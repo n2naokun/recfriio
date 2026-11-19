@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 KASHIWAYA Rikuto
+
 #include <math.h>
 #include <string.h>
 #include "Tc90522.hpp"

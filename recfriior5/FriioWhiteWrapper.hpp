@@ -1,3 +1,6 @@
+// Copyright (c) 2008 clworld
+// Copyright (c) recfriio FriioExpress patch contributors
+
 // $Id$
 // 白凡のラッパ
 

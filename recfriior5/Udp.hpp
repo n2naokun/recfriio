@@ -1,3 +1,5 @@
+// Copyright (c) recfriio UDP patch contributors
+
 /* pubic domain */
 #ifndef _UDP_H
 #define _UDP_H

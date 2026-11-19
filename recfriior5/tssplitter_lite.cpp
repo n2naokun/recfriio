@@ -1,4 +1,9 @@
 /* -*- tab-width: 4; indent-tabs-mode: t -*- */
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2009 querulous
+// Copyright (c) 2010 Naoya OYAMA
+// Copyright (c) 2012 stz2012 (tslroom)
+
 /* tssplitter_lite.c -- split TS stream.
 
    Copyright 2009 querulous

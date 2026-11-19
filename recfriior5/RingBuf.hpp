@@ -1,3 +1,7 @@
+// Copyright (c) 2008 clworld
+// Copyright (c) 2015 stz2012 (tslroom)
+// Copyright (c) 2026 KASHIWAYA Rikuto
+
 // $Id$
 // Thread間データ転送用 リングバッファ(FIFO)管理クラス
 

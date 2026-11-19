@@ -1,3 +1,8 @@
+// Copyright (c) 2008 clworld
+// Copyright (c) 2012 stz2012 (tslroom)
+// Copyright (c) 2013 Yoshihiro Hayashi (sirrow)
+// Copyright (c) 2026 KASHIWAYA Rikuto
+
 // $Id$
 // 設定用
 

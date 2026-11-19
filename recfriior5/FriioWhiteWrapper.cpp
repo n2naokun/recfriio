@@ -1,3 +1,7 @@
+// Copyright (c) 2008 clworld
+// Copyright (c) recfriio FriioExpress patch contributors
+// Copyright (c) 2026 KASHIWAYA Rikuto
+
 // $Id: FriioWhite.cpp 5689 2008-09-18 19:48:59Z clworld $
 // 白凡
 

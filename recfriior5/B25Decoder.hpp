@@ -1,3 +1,6 @@
+// Copyright (c) 2008 clworld
+// Copyright (c) 2026 KASHIWAYA Rikuto
+
 // $Id$
 // arib25
 
