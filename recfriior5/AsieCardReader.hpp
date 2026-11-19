@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 //
 // QRS-UT100B の内蔵 B-CAS スロット（ASICEN ASIE5606）を、ASV5211 の I2C 経由で T=1 で使う。
 // arib25 の B_CAS_CARD_TRANSPORT として渡せるので、外付けのカードリーダーなしで --b25 が使える。

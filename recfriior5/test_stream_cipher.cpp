@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 //
 // AsieStreamCipher（USB 転送の DES を外す処理）の試験（make test）。答えは実機と、置き換える前の decrypt.c から取った。
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Copyright (c) recfriio UDP patch contributors
 
 /* pubic domain */

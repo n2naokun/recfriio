@@ -1,6 +1,7 @@
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2008 clworld
 // Copyright (c) 2015 stz2012 (tslroom)
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 
 // $Id$
 // Thread間データ転送用 リングバッファ(FIFO)管理クラス

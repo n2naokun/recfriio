@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 
 #include <string.h>
 #include <unistd.h>

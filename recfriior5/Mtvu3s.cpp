@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 
 /**
  * SKNET MonsterTV U3S (EM28178 + TC90522 x2 + FC0013 + QM1D1C0042)

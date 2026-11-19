@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 //
 // QRS-UT100B の内蔵 B-CAS スロット（ASICEN ASIE5606）を T=1 で使う。説明は AsieCardReader.hpp。
 //

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 KASHIWAYA Rikuto
+# Copyright (c) 2026 waya0125
 """QRS-UT100B（ASICEN ASV5211）のファームを、付属 CD のドライバーから取り出して送る。
 
 ファームはメーカーの著作物なので、このリポジトリには入れていない。

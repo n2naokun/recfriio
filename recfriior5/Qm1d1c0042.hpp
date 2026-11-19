@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 
 #ifndef _QM1D1C0042_HPP_
 #define _QM1D1C0042_HPP_

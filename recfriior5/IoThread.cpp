@@ -1,5 +1,6 @@
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2008 clworld
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 
 // $Id: IoThread.cpp 6314 2008-11-04 02:17:00Z clworld $
 // 非同期リクエスト発行スレッド

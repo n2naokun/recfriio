@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2008 clworld
 
 // $Id: error.cpp 5663 2008-09-15 17:53:59Z clworld $

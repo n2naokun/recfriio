@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2008 clworld
 // Copyright (c) 2012 stz2012 (tslroom)
 // Copyright (c) 2013 Yoshihiro Hayashi (sirrow)
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 
 // $Id$
 // 設定用

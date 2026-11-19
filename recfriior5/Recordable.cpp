@@ -1,5 +1,6 @@
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2008 clworld
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 
 // $Id: Recordable.cpp 5663 2008-09-15 17:53:59Z clworld $
 // 

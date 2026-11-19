@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: MIT
 // Copyright (c) 2008 clworld
 // Copyright (c) 2012 stz2012 (tslroom)
 // Copyright (c) 2013 Yoshihiro Hayashi (sirrow)
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 
 // $Id: recfriio.cpp 5710 2008-09-19 15:04:04Z clworld $
 

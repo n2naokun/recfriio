@@ -3,9 +3,12 @@
 本リポジトリに含まれる各コンポーネントのライセンスは以下の通りです。
 それぞれの詳細な条項は `licenses/` ディレクトリ内の各ファイルをご確認ください。
 
-1. **recfriio (本体)**
-   - 著作権者: FUKAUMI Naoki
-   - ライセンス: 2-Clause BSD License (`licenses/LICENSE.recfriio`)
+1. **recfriio (本体、recfriior5/)**
+   - ファイルごとに先頭の `SPDX-License-Identifier` と `Copyright` の行に従います。
+   - USB の命令に関わる部分（AbstractFriio・Friio*）: BonDriver のライセンス (`licenses/LICENSE.bondriver`) と MIT License
+   - Hdus・Hdp: 2-Clause BSD License (`licenses/LICENSE.recfriio`、著作権者: FUKAUMI Naoki)
+   - tssplitter_lite: GPL-3.0-or-later（著作権者: querulous, Naoya OYAMA）
+   - それ以外: MIT License (`licenses/LICENSE.mit`)。元の作者が Public Domain として出した部分を含みます
 
 2. **as11loader**
    - 著作権者: FUKAUMI Naoki
@@ -16,5 +19,5 @@
    - 条件: 免責条項同意による諸権利不行使 (`licenses/LICENSE.arib25`)
 
 4. **追加ツール群・ドキュメント (tools/, firmware/load_firmware.sh, docs/)**
-   - 著作権者: KASHIWAYA Rikuto (waya0125)
+   - 著作権者: waya0125
    - ライセンス: MIT License (`licenses/LICENSE.mit`)

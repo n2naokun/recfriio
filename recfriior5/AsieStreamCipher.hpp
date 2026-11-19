@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 //
 // ASIE5606 が USB 転送で TS にかける DES を外す。中身は AsieStreamCipher.cpp を参照。
 // 放送のスクランブル（ARIB STD-B25）とは別のもので、外したあとも B25 のスクランブルは残る。

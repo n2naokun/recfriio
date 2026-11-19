@@ -1,6 +1,7 @@
+// SPDX-License-Identifier: LicenseRef-BonDriver AND MIT
 // Copyright (c) 2008 clworld
 // Copyright (c) recfriio FriioExpress patch contributors
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 
 // $Id: FriioExpress.cpp 5689 2008-09-18 19:48:59Z clworld $
 // 凡Exp

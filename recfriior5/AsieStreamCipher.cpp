@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 KASHIWAYA Rikuto
+// Copyright (c) 2026 waya0125
 //
 // ASIE5606 が USB 転送で TS にかける DES を外す（QRS-UT100B / MonsterTV HDUS 系）。
 //

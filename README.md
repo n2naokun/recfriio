@@ -158,9 +158,14 @@ sudo ./tools/compare_tuners.sh
 本リポジトリに含まれる各コンポーネントのライセンスは以下の通りです。  
 詳細は `licenses/` ディレクトリ内の各ファイルをご確認ください。
 
-- **recfriio / as11loader**: [2-Clause BSD License](licenses/LICENSE.recfriio) (Copyright (c) FUKAUMI Naoki)
+- **recfriio 本体（`recfriior5/`）**: ファイルごとに先頭の `SPDX-License-Identifier` に従います。
+  - USB の命令に関わる部分（`AbstractFriio`・`Friio*`）: [BonDriver のライセンス](licenses/LICENSE.bondriver)と MIT
+  - `Hdus`・`Hdp`: [2-Clause BSD License](licenses/LICENSE.recfriio) (Copyright (c) FUKAUMI Naoki)
+  - `tssplitter_lite`: GPL-3.0-or-later（Copyright (c) querulous, Naoya OYAMA）
+  - それ以外: [MIT License](licenses/LICENSE.mit)（元の作者が Public Domain として出した部分を含みます）
+- **as11loader**: [2-Clause BSD License](licenses/LICENSE.as11loader) (Copyright (c) FUKAUMI Naoki)
 - **arib25**: [仕様確認テストプログラム ライセンス](licenses/LICENSE.arib25) (Copyright (c) 茂木 和洋)
-- **追加ツール群・ドキュメント (`tools/`, `firmware/load_firmware.sh`, `docs/`)**: [MIT License](licenses/LICENSE.mit) (Copyright (c) 2026 KASHIWAYA Rikuto)
+- **追加ツール群・ドキュメント (`tools/`, `firmware/load_firmware.sh`, `docs/`)**: [MIT License](licenses/LICENSE.mit) (Copyright (c) 2026 waya0125)
 
 ---
 
