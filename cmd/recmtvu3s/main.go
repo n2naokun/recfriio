@@ -239,6 +239,9 @@ loop:
 			if settler != nil {
 				packets = settler.Feed(packets)
 			}
+			if len(packets) == 0 {
+				continue
+			}
 			if stats != nil {
 				stats.Add(packets)
 			}
