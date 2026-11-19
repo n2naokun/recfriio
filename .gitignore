@@ -1,5 +1,6 @@
 *.o
 *.dep
+*.d
 recfriior5/recfriio
 arib25/b25
 tools/probe_bcas
@@ -13,3 +14,4 @@ firmware/*.sys
 firmware/*.inf
 __pycache__/
 test_stream_cipher
+recfriior5/obj/
