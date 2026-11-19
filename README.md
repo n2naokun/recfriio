@@ -2,17 +2,30 @@
 
 Linux 向けの USB デジタルテレビチューナー録画プログラム recfriio のフォークです。  
 2026-11-19 に、C/C++ の recfriio を Go で書き直したものに置き換えました。  
-動かせるのは、実機で確かめた次の 2 機種です。
+動かせるのは、実機で確かめた次の 2 機種で、どちらも `recfriio` 1 つで扱えます。
 
-| コマンド | 機器 |
-|---|---|
-| `recut100b` | Quixun QRS-UT100B（地デジ） |
-| `recmtvu3s` | SKNET MonsterTV U3S（地デジ・BS・CS） |
+| 機器 | 受けられるもの | 機種を決めるとき |
+|---|---|---|
+| Quixun QRS-UT100B（`3275:7020`） | 地デジ・CATV | `recfriio --hdp`（`recut100b` と同じ） |
+| SKNET MonsterTV U3S（`3275:9015`） | 地デジ・BS・CS | `recfriio --u3s`（`recmtvu3s` と同じ） |
+
+```bash
+bin/recfriio 21 30 out.ts                  # 地デジ。空いている機器（UT100B → U3S の順）で受ける
+bin/recfriio BS15_0 30 out.ts              # BS・CS は U3S で受ける
+bin/recfriio --hdp --b25 27 30 nhk.ts      # UT100B に決めて、内蔵の B-CAS で外す
+bin/recfriio --device /dev/bus/usb/003/044 CS2 - -   # 機器ファイルで決める（USB の ID から機種が決まる）
+```
+
+- 機種は、`--hdp`・`--u3s`（`--mtvu3s` とも書ける）、`--device` の USB の ID、チャンネルの順で決めます。どれも無ければ、受けられる機種のうち、ほかのプロセスが使っていないものを UT100B → U3S の順に開きます。
+- `--b25` は、UT100B なら内蔵のスロット、U3S なら PC/SC のリーダーを使います（`--pcsc` を付けると UT100B でもリーダー）。
+- 前からある `recut100b`・`recmtvu3s` も残しています。中身は同じで、機種がそれぞれ決まっているだけです。
+- C/C++ 版の `--hdus` など、Go 版に無い機種は使えません。
+- 環境変数 `RECFRIIO_USB_TRACE=1`（C/C++ 版と同じ名前。`RECUT100B_USB_TRACE=1` も使える）で、UT100B に送る制御転送を全部、標準エラーに書きます。
 
 cgo・libusb・libpcsclite を使わず、Linux の usbfs と pcscd に直接話すバイナリです。  
 C/C++ 版（Friio・HDUS・HDP などの古い機種を含む）は、タグ [`cpp-final`](../../tree/cpp-final) に残しています。
 
-以下はまず `recut100b`（QRS-UT100B）の説明です。
+以下は機種ごとの説明です。まず QRS-UT100B（`recfriio --hdp`、`recut100b`）。
 
 - recfriio（C/C++）の UT100B の部分（`--hdp`）を Go で書き直したもの
 
@@ -89,46 +102,50 @@ bin/ut100b-firmware load asv5211-firmware.bin
 
 ## 使い方
 
-引数の形は recfriio・recpt1 と同じです。
+引数の形は C/C++ 版の recfriio・recpt1 と同じです。
 
 ```bash
-bin/recut100b [オプション] チャンネル 秒 出力先
+bin/recfriio [オプション] チャンネル 秒 出力先
 ```
 
 | 引数 | 意味 |
 |---|---|
-| チャンネル | `13`〜`62`（UHF）、`C13`〜`C63`（CATV。`K13` とも書ける） |
+| チャンネル | `13`〜`62`（UHF）、`C13`〜`C63`（CATV。`K13` とも書ける。UT100B だけ）、`BS01_0`〜`BS23_7`・`CS2`〜`CS24`（U3S だけ） |
 | 秒 | 録る長さ。`-` なら止められる（SIGINT・SIGTERM）まで |
 | 出力先 | 書き出すファイル。`-` なら標準出力 |
 
 | オプション | 意味 |
 |---|---|
-| `--b25` | B-CAS カードでスクランブルを外す。カードは内蔵のスロットのもの |
-| `--pcsc` | `--b25` で、外付けのカードリーダーを使う（pcscd の窓口は `PCSCLITE_CSOCK_NAME` で変えられる） |
+| `--hdp` / `--u3s`（`--mtvu3s`） | 機種を UT100B / U3S に決める（`recut100b`・`recmtvu3s` には無い） |
+| `--b25` | B-CAS カードでスクランブルを外す。UT100B は内蔵のスロット、U3S は PC/SC のリーダー |
+| `--pcsc` | `--b25` で、外付けのカードリーダーを使う（`--b25` も付いたことになる。pcscd の窓口は `PCSCLITE_CSOCK_NAME` で変えられる） |
+| `--stats` | 終わりに TS のヘッダーを数えた結果（同期・TEI・連続カウンター・PID・PAT の TSID）を書く |
 | `--round N` | MULTI2 の段数（既定 4） |
 | `--strip` | ヌルパケットを捨てる（UT100B はもともと出さない） |
 | `--sync` | `--b25` で、鍵がそろうまでの失敗を数えない |
-| `--device PATH` | 使う UT100B（`/dev/bus/usb/BBB/DDD`）。既定は空いているもの |
-| `--firmware FILE` | ファームの無い UT100B しか無ければ、これを送ってから使う |
+| `--device PATH` | 使う機器（`/dev/bus/usb/BBB/DDD`）。USB の ID から機種が決まる。既定は空いているもの |
+| `--firmware FILE` | （UT100B）ファームの無い UT100B しか無ければ、これを送ってから使う |
+| `--no-settle` | （U3S）受け始めの、復調部が落ち着く前のパケットも捨てずに書き出す |
+| `--no-descramble` | （U3S）USB 転送の暗号を外さずに書き出す（照合用） |
 | `--raw FILE` | B25 を通す前の TS も書き出す（照合用） |
 | `--card-log FILE` | B-CAS カードとのやり取りを書き出す（照合用。鍵が入るので人に渡さない） |
 
 ```bash
 # NHK 総合（ch27 の例）を 30 秒、内蔵の B-CAS で外して録る
-bin/recut100b --b25 27 30 nhk.ts
+bin/recfriio --hdp --b25 27 30 nhk.ts
 
 # 標準出力に流し続ける（Mirakurun などから）
-bin/recut100b --b25 27 - -
+bin/recfriio --hdp --b25 27 - -
 ```
 
 ほかのプロセスが使っている UT100B は選びません（USB のインターフェースを取れないため）。  
-環境変数 `RECUT100B_USB_TRACE=1` で、送る制御転送を全部、標準エラーに書きます。
+`bin/recut100b …` は `bin/recfriio --hdp …` と同じです。
 
-## recfriio との違い
+## C/C++ 版の recfriio との違い
 
-- 対象は QRS-UT100B だけです。
+- 対象は QRS-UT100B と MonsterTV U3S だけです（Friio・HDUS・HDP などは無い）。
 - `--udp`・`--http`・`--sid`・`--lnb`・`--lockfile` はありません。
-- ヌルパケットは UT100B の TS フィルターで捨てています（recfriio と同じ）。
+- UT100B のヌルパケットは、UT100B の TS フィルターで捨てています（C/C++ 版と同じ）。
 - B25 の処理は arib25 をそのまま移しましたが、失敗したときの扱いを 2 つ変えています（`internal/b25/b25.go` の頭）。
 
 ## 試験
@@ -149,15 +166,15 @@ go test ./...
 実機での照合は `tools/arib25-compare/compare.sh` です。  
 `--raw` と `--card-log` で取った TS とカードの記録を、arib25（C）と Go で外して比べます。
 
-## MonsterTV U3S（`recmtvu3s`）
+## MonsterTV U3S（`recfriio --u3s`、`recmtvu3s`）
 
-SKNET MonsterTV U3S（`3275:9015`、地デジ・BS・CS）用の `recmtvu3s` も、このリポジトリに入っています。  
-recfriio の `--u3s`（`Mtvu3s`・`Tc90522`・`Fc0013`・`Qm1d1c0042`）を Go に移したものです。
+SKNET MonsterTV U3S（`3275:9015`、地デジ・BS・CS）は `recfriio --u3s`（`recmtvu3s` と同じ）で受けます。  
+C/C++ 版の recfriio の `--u3s`（`Mtvu3s`・`Tc90522`・`Fc0013`・`Qm1d1c0042`）を Go に移したものです。
 
 ```bash
-bin/recmtvu3s --stats 21 30 out.ts       # 地デジ
-bin/recmtvu3s --stats BS15_0 30 out.ts   # BS
-bin/recmtvu3s --stats CS2 30 out.ts      # 110 度 CS
+bin/recfriio --u3s --stats 21 30 out.ts       # 地デジ
+bin/recfriio --stats BS15_0 30 out.ts         # BS（BS・CS は U3S しか受けられないので --u3s は無くてもよい）
+bin/recfriio --stats CS2 30 out.ts            # 110 度 CS
 ```
 
 - USB は isochronous（EP `0x84`、altsetting 1、940 バイト × 16 フレーム / URB）で受けます（`internal/usbfs` の `StartIsoStream`）。
@@ -224,5 +241,5 @@ AES を外したあと（2026-11-19、3 秒ずつ）:
 
 - 初期化・選局の手順と値: recfriio（FUKAUMI Naoki、2 条項 BSD）と、その HDP・UT100B の対応（tslroom、stz2012）
 - B25・MULTI2・B-CAS の命令: arib25（茂木 和洋）の移植
-- MonsterTV U3S の部分（`cmd/recmtvu3s`・`internal/em28178`・`tc90522`・`fc0013`・`qm1d1c0042`・`mtvu3s`・`i2c`・`tscheck`）: waya0125（MIT。移植元の recfriio の U3S の部分も MIT）
+- MonsterTV U3S の部分（`internal/em28178`・`tc90522`・`fc0013`・`qm1d1c0042`・`mtvu3s`・`i2c`・`tscheck`）: waya0125（MIT。移植元の recfriio の U3S の部分も MIT）
 - それ以外（`tools/`・`firmware/`・`docs/` を含む）: waya0125（MIT）

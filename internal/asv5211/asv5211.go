@@ -52,10 +52,11 @@ type Bridge struct {
 	Trace io.Writer
 }
 
-// New は t に送る Bridge を作る。環境変数 RECUT100B_USB_TRACE があれば標準エラーに記録を書く。
+// New は t に送る Bridge を作る。環境変数 RECFRIIO_USB_TRACE（C++ 版と同じ名前）か
+// RECUT100B_USB_TRACE があれば、標準エラーに記録を書く。
 func New(t Transport) *Bridge {
 	b := &Bridge{t: t}
-	if os.Getenv("RECUT100B_USB_TRACE") != "" {
+	if os.Getenv("RECFRIIO_USB_TRACE") != "" || os.Getenv("RECUT100B_USB_TRACE") != "" {
 		b.Trace = os.Stderr
 	}
 	return b
