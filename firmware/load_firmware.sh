@@ -2,7 +2,7 @@
 # QRS-UT100B にファームを送る（ファームの無い状態 1738:5211 → 3275:7020）。
 #   ./firmware/load_firmware.sh [付属 CD の Quixun_AS11Loader.sys]
 # firmware/asv5211-firmware.bin が無ければ、渡された .sys から先に取り出す。
-# ファームはメーカーの著作物なので、リポジトリには入れていない（README の「ファームウェア」を参照）。
+# ファームはメーカーの著作物なので、リポジトリには入れていない（docs/QRS-UT100B.md の「ファーム」を参照）。
 set -eu
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOL="$DIR/../tools/ut100b-firmware.py"

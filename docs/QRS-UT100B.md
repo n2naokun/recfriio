@@ -1,6 +1,63 @@
 # Quixun QRS-UT100B (ASICEN ASV5211 + ASIE5606) 動作仕様 & 検証レポート
 
-調べたのは C++ 版の recfriio を使っていたとき（タグ `cpp-final`）なので、文中のファイル名は C++ 版のものです。  
+Quixun QRS-UT100B（地デジ・CATV）を Go 版の `recfriio --hdp`（`recut100b` と同じ）で使うときの説明と、中身を調べた結果です。  
+共通の使い方とオプションは [README](../README.md) にあります。
+
+## Go 版での使い方
+
+### ファーム
+
+UT100B は電源が入るたびに、ファームの無い状態（`1738:5211`）で起動します。  
+ファームを送ると `3275:7020` として出直します。  
+ファームはメーカーの著作物なので、このリポジトリには含めていません。  
+製品に付いていた CD の `Driver` フォルダーにある `Quixun_AS11Loader.sys` から取り出します。
+
+```bash
+bin/ut100b-firmware extract /path/to/CD/ROBRO_Origin/Driver/Quixun_AS11Loader.sys -o asv5211-firmware.bin
+bin/ut100b-firmware load asv5211-firmware.bin
+```
+
+`recfriio --firmware asv5211-firmware.bin ...` とすると、ファームの無い UT100B しか無いときに送ってから使います。
+
+### UT100B での動き
+
+- 受けられるのは地デジ（`13`〜`62`）と CATV（`C13`〜`C63`）です。
+- UT100B の中の ASIE5606 が USB 転送でかける DES は、いつも外します（放送のスクランブルとは別のもの。外したあとも B25 のスクランブルは残る）。
+- `--b25` は内蔵のスロットのカードを使います。外付けのリーダーを使うときは `--pcsc` を付けます。
+- ヌルパケットは UT100B の TS フィルターで捨てているので、`--strip` が無くても出ません（C/C++ 版と同じ）。
+- ほかのプロセスが使っている UT100B は選びません（USB のインターフェースを取れないため）。
+- 環境変数 `RECFRIIO_USB_TRACE=1` で、送る制御転送を全部、標準エラーに書きます。
+
+```bash
+# NHK 総合（ch27 の例）を 30 秒、内蔵の B-CAS で外して録る
+bin/recfriio --hdp --b25 27 30 nhk.ts
+```
+
+### 確かめた結果
+
+Ubuntu 26.04（kernel 7.0）、amd64 で確かめました。  
+同じ作りの MonsterTV HDUS・HDUC などは、実機が無いので対象にしていません。
+
+| 確かめたこと | 結果 |
+|---|---|
+| 制御転送の並び | recfriio が ch19 を開いて閉じるまでに送る 234 回と、1 回ずつ同じ（`internal/ut100b` の試験） |
+| 受信（ch19、60 秒） | 約 64.7 万パケット、TS の誤り・欠けなし |
+| 内蔵 B-CAS で復号（`--b25`、60 秒） | 全パケットのスクランブルが外れ、誤り・欠けなし |
+| 内蔵 B-CAS で復号（`--b25`、30 分） | 約 1949 万パケットすべてのスクランブルが外れ、TS の誤り・欠けなし。USB の受け取りの取りこぼしなし |
+| arib25（C）との照合 | 同じ入力（B25 を通す前の TS、60 秒・約 120 MB）を arib25 と Go で外した結果が、バイト単位で同じ（`tools/arib25-compare`） |
+| ファームの取り出し | 付属 CD の 2 つのローダーから、知っている 3 つのファームがハッシュどおりに取り出せる |
+| ファームの送り込み（`--firmware`） | 抜き差しのあと、取り出したファームを送って `3275:7020` で出直し、続けて `--b25` で 60 秒受けた。全部のスクランブルが外れ、誤り・欠けなし |
+| 外付けのカードリーダー（`--pcsc`） | ACS ACR39U（pcscd 経由）で `--b25` を 20 秒。全部のスクランブルが外れ、誤り・欠けなし |
+
+まだ確かめていないこと:
+- 30 分より長い受信。
+
+実機での照合は `tools/arib25-compare/compare.sh` です。  
+`--raw` と `--card-log` で取った TS とカードの記録を、arib25（C）と Go で外して比べます。
+
+## C++ 版との対応
+
+以下の調べものは C++ 版の recfriio を使っていたとき（タグ `cpp-final`）なので、文中のファイル名は C++ 版のものです。  
 いまの Go 版で同じことをしている場所は次のとおり。
 
 | C++ 版（`cpp-final`） | Go 版 |
@@ -10,9 +67,9 @@
 | `recfriior5/AsieCardReader.cpp` | `internal/asie5606/card.go` |
 | `arib25/`（B25・MULTI2・B-CAS の命令） | `internal/b25/`・`internal/multi2/`・`internal/bcas/` |
 | `tools/ut100b-firmware.py` | `cmd/ut100b-firmware`・`internal/firmware/` |
-| `RECFRIIO_USB_TRACE=1` | `RECUT100B_USB_TRACE=1` |
+| `RECFRIIO_USB_TRACE=1` | `RECFRIIO_USB_TRACE=1`（`RECUT100B_USB_TRACE=1` も使える） |
 | `make -C recfriior5 test` | `go test ./...` |
-| `recfriio --hdp --b25` | `recut100b --b25` |
+| `recfriio --hdp --b25` | `recfriio --hdp --b25`（`recut100b --b25` と同じ） |
 
 ## 1. 概要
 Quixun QRS-UT100B は、地上デジタルテレビ放送用の USB チューナーです。  
@@ -36,7 +93,7 @@ Quixun QRS-UT100B は、地上デジタルテレビ放送用の USB チューナ
 
 各レジスタの名前と、意味の分かっていないものは `recfriior5/Hdp.cpp` の先頭にまとめてある。
 
-実機で確かめたことと、まだ確かめていないことは README の「動作確認済みデバイス」にまとめてある。
+実機で確かめたことと、まだ確かめていないことは上の「確かめた結果」にまとめてある。
 
 ---
 
@@ -124,7 +181,7 @@ QRS-UT100B     58.5 MB    15.5 Mbps  30.2s      0         0         0         0 
 
 この 30 秒・1 回の比較では、3 台とも誤り・欠けはなかった。  
 UT100B のビットレートが低く見えるのは、TS フィルターでヌルパケット（PID `0x1fff`）を捨てているためで、ほかの PID の毎秒のパケット数は 3 台でほぼ同じだった（2026-11-11 に数え直した）。  
-長い受信での結果は README の「動作確認済みデバイス」にある。
+長い受信での結果は上の「確かめた結果」にある。
 
 ---
 
