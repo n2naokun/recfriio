@@ -10,6 +10,8 @@ cgo・libusb・libpcsclite を使わず、Linux の usbfs と pcscd に直接話
   カードは UT100B の内蔵スロットのものを使います（外付けのリーダーは `--pcsc`）。
 - 付属 CD のドライバーからファームを取り出して送る（`ut100b-firmware`）
 
+SKNET MonsterTV U3S（地デジ・BS・CS）用の `recmtvu3s` も入っています（下の「MonsterTV U3S」）。
+
 ## 動作確認
 
 | 機器 | 環境 | 結果 |
@@ -135,6 +137,56 @@ go test ./...
 実機での照合は `tools/arib25-compare/compare.sh` です。  
 `--raw` と `--card-log` で取った TS とカードの記録を、arib25（C）と Go で外して比べます。
 
+## MonsterTV U3S（`recmtvu3s`）
+
+SKNET MonsterTV U3S（`3275:9015`、地デジ・BS・CS）用の `recmtvu3s` も、このリポジトリに入っています。  
+recfriio の `--u3s`（`Mtvu3s`・`Tc90522`・`Fc0013`・`Qm1d1c0042`）を Go に移したものです。
+
+```bash
+bin/recmtvu3s --stats 21 30 out.ts       # 地デジ
+bin/recmtvu3s --stats BS15_0 30 out.ts   # BS
+bin/recmtvu3s --stats CS2 30 out.ts      # 110 度 CS
+```
+
+- USB は isochronous（EP `0x84`、altsetting 1、940 バイト × 16 フレーム / URB）で受けます（`internal/usbfs` の `StartIsoStream`）。
+- EM28178 が USB 転送でかける AES-128-ECB は、`internal/mtvu3s` の `Descrambler` で外します。  
+  `--no-descramble` を付けると外さずに書き出します（照合用。ペイロードは暗号がかかったまま）。
+- 受け始めの、復調部が落ち着く前のパケット（TEI 付き。地デジで 1 秒弱）は捨てます（`Settler`）。  
+  TEI の無いパケットが 5,000 個続いたら書き出し始めます。`--no-settle` で捨てずに書き出します。
+- 衛星は、TMCC に載っている TSID の一覧と突き合わせて TS を選びます。  
+  BS は、登録年のビット（`0x0e00`）を無視して当てます（`BS23_1` → `0x4971` など）。  
+  CS は表（CS2 = `0x6020` など）から渡します。  
+  一覧に無い TS（例: 2026-11-19 の `BS23_2`）を頼むとエラーで止まります。  
+  recfriio は黙って別の TS（一覧の最初）を出していました。
+- U3S には B-CAS のスロットが無いので、`--b25` はいつも PC/SC のカードリーダーを使います。
+- `--stats` は、終わりに TS のヘッダーだけを数えた結果（同期・TEI・連続カウンター・PID）を書きます。ペイロードは見ないので、暗号がかかったままでも使えます。
+- 地デジの C/N は Linux の tc90522 と同じ式です（recfriio の U3S の式とは値が違います）。
+- 試験: `internal/mtvu3s/golden_test.go` が、チップの手順で I2C に送るバイト列を、recfriio の C++ のクラスで取った記録（`testdata/i2c-golden.txt`）と比べます。
+
+2026-11-19 の実機（`--no-descramble`、暗号を外す前の TS のヘッダーで確かめた結果）:
+
+| チャンネル | 長さ | パケット | 同期の乱れ | TEI | 連続カウンターの飛び | C/N |
+|---|---|---|---|---|---|---|
+| 地デジ ch21 | 5 秒 | 99,551 | 0 | 0 | 0 | 31.4 dB |
+| BS15_0 | 5 秒 | 79,493 | 0 | 0 | 0 | 13.8 dB |
+| CS2 | 5 秒 | 173,422 | 0 | 0 | 0 | 10.6 dB |
+| 地デジ ch21（頭を捨てない） | 60 秒 | 1,195,083 | 0 | 6,369 | 69 | 31.1 dB |
+| 地デジ ch21（頭を捨てる） | 60 秒 | 1,181,834 | 0 | 0 | 0 | — |
+
+頭を捨てないときの TEI は全部、受け始めの 1 秒に固まっていました（ロックの直後で、復調部がまだ落ち着いていない）。  
+recfriio の確かめも末尾だけを数えていた（`tail20k_tei`）ので、たぶん同じことが起きています。  
+衛星の TS は、PAT の `transport_stream_id`（暗号のかかっていない 8〜9 バイト目）で確かめました（CS2 = `0x6020`、BS15_0 = `0x40f1`、BS01_0 = `0x4010`、BS23_1 = `0x4971`、BS23_3 = `0x4973`）。
+
+AES を外したあと（2026-11-19、3 秒ずつ）:
+
+| チャンネル | PAT の TSID | パケット | 同期の乱れ・TEI・連続カウンターの飛び | PAT の CRC-32 が合ったもの |
+|---|---|---|---|---|
+| 地デジ 21 | `0x7fe4` | 47,108 | 0 | 23 |
+| BS15_0 | `0x40f1` | 47,665 | 0 | 30 |
+| CS2 | `0x6020` | 103,978 | 0 | 30 |
+
+`--b25`（外付けのリーダー ACR39U、地デジ 21 で 5 秒）: 87,075 パケット、乱れ 0、スクランブルの残り 0、PAT の CRC-32 が合ったもの 44。
+
 ## 資料
 
 - `docs/QRS-UT100B.md`: UT100B の中身（ASV5211・ASIE5606・復調部・チューナー）、レジスタ、USB 転送の暗号について調べた結果
@@ -146,4 +198,5 @@ go test ./...
 
 - 初期化・選局の手順と値: recfriio（FUKAUMI Naoki、2 条項 BSD）と、その HDP・UT100B の対応（tslroom、stz2012）
 - B25・MULTI2・B-CAS の命令: arib25（茂木 和洋）の移植
+- MonsterTV U3S の部分（`cmd/recmtvu3s`・`internal/em28178`・`tc90522`・`fc0013`・`qm1d1c0042`・`mtvu3s`・`i2c`・`tscheck`）: waya0125（MIT。移植元の recfriio の U3S の部分も MIT）
 - それ以外: KASHIWAYA Rikuto（MIT）

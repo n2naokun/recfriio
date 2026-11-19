@@ -5,7 +5,7 @@
 // libusb も cgo も使わない。
 //
 // 使うのは、機器の記述子を読むこと、インターフェースを取ること、
-// 制御転送、URB を何個も投げておくバルクの受信（Stream）だけ。
+// 制御転送、URB を何個も投げておくバルク・isochronous の受信（Stream）だけ。
 package usbfs
 
 import (
@@ -41,7 +41,7 @@ type ctrlTransfer struct {
 	data        uintptr
 }
 
-// usbdevfs_urb（iso_frame_desc は使わないので持たない）
+// usbdevfs_urb（iso_frame_desc は、isochronous のときに後ろへ並べる。isoFrameDesc）
 type urb struct {
 	typ             uint8
 	endpoint        uint8
@@ -68,7 +68,19 @@ var (
 	ioctlSetInterface     = ioc(iocRead, 4, unsafe.Sizeof([2]uint32{}))
 )
 
-const urbTypeBulk = 3
+const (
+	urbTypeIso  = 0
+	urbTypeBulk = 3
+	// USBDEVFS_URB_ISO_ASAP: 空いている一番早いフレームから送る
+	urbFlagIsoASAP = 0x02
+)
+
+// usbdevfs_iso_packet_desc（isochronous の 1 フレームぶん）
+type isoFrameDesc struct {
+	length       uint32
+	actualLength uint32
+	status       uint32
+}
 
 func ioctl(fd int, request, arg uintptr) (uintptr, error) {
 	for {

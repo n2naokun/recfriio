@@ -231,7 +231,11 @@ loop:
 				break loop
 			}
 			packets := aligner.Feed(chunk)
-			if raw != nil && len(packets) > 0 {
+			if len(packets) == 0 {
+				// 受け始めの捨てている間など。空のまま B25 に渡すと「TS ではない入力」で失敗を数えてしまう
+				continue
+			}
+			if raw != nil {
 				if _, err := raw.Write(packets); err != nil {
 					writeErr = err
 					break loop
