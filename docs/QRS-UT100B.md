@@ -1,4 +1,4 @@
-# Quixun QRS-UT100B (ASICEN ASV5211 + ASIE5606) 動作仕様 & 検証レポート
+# Quixun QRS-UT100B（ASICEN ASV5211 + ASIE5606）
 
 Quixun QRS-UT100B（地デジ・CATV）を Go 版の `recfriio --hdp`（`recut100b` と同じ）で使うときの説明と、中身を調べた結果です。  
 共通の使い方とオプションは [README](../README.md) にあります。
@@ -55,23 +55,8 @@ Ubuntu 26.04（kernel 7.0）、amd64 で確かめました。
 実機での照合は `tools/arib25-compare/compare.sh` です。  
 `--raw` と `--card-log` で取った TS とカードの記録を、arib25（C）と Go で外して比べます。
 
-## C++ 版との対応
+## 1. ハードウェア構成
 
-以下の調べものは C++ 版の recfriio を使っていたとき（タグ `cpp-final`）なので、文中のファイル名は C++ 版のものです。  
-いまの Go 版で同じことをしている場所は次のとおり。
-
-| C++ 版（`cpp-final`） | Go 版 |
-|---|---|
-| `recfriior5/Hdp.cpp`（初期化・選局・C/N・区切り合わせ） | `internal/ut100b/tuner.go`・`stream.go` |
-| `recfriior5/AsieStreamCipher.cpp`（以前の `AsieDescrambler.cpp`、`decrypt.c`） | `internal/asie5606/stream_cipher.go`（Go の `crypto/des`） |
-| `recfriior5/AsieCardReader.cpp` | `internal/asie5606/card.go` |
-| `arib25/`（B25・MULTI2・B-CAS の命令） | `internal/b25/`・`internal/multi2/`・`internal/bcas/` |
-| `tools/ut100b-firmware.py` | `cmd/ut100b-firmware`・`internal/firmware/` |
-| `RECFRIIO_USB_TRACE=1` | `RECFRIIO_USB_TRACE=1`（`RECUT100B_USB_TRACE=1` も使える） |
-| `make -C recfriior5 test` | `go test ./...` |
-| `recfriio --hdp --b25` | `recfriio --hdp --b25`（`recut100b --b25` と同じ） |
-
-## 1. 概要
 Quixun QRS-UT100B は、地上デジタルテレビ放送用の USB チューナーです。  
 ハードウェアの構成は次のとおり。  
 チップの刻印を UT100B の実機で確かめたものはなく、確度を分けて書く。
@@ -91,17 +76,32 @@ Quixun QRS-UT100B は、地上デジタルテレビ放送用の USB チューナ
 - 1 バイトだけの書き込みは命令として受け取る（`0xff` はリセット）。  
   読むと状態の 1 バイト（`0xc8`）が続くだけで、レジスタは読み返せない（下の「読むだけで調べた結果」）。
 
-各レジスタの名前と、意味の分かっていないものは `recfriior5/Hdp.cpp` の先頭にまとめてある。
+```text
+USB (ASV5211, 3275:7020)
+ ├── I2C 0x4a: ASIE5606（B-CAS の内蔵スロット、USB 転送の DES）
+ └── I2C 0x20: 復調部 ──[0xfe]──▶ 0xc0: チューナー
+```
 
-実機で確かめたことと、まだ確かめていないことは上の「確かめた結果」にまとめてある。
+各レジスタの名前と、意味の分かっていないものは `recfriior5/Hdp.cpp`（タグ `cpp-final`）の先頭にまとめてある。
 
----
+### チューナー・復調部を読むだけで調べた結果（2026-11-11）
 
-## 2. デバイスの認識とファームウェア展開
+- 復調部（`0x20`）は全レジスタを読める（`0x02`）。  
+  初期化で書いた値がそのまま読め、読み方が正しいことは確かめた。  
+  型番を示すレジスタは見つかっていない。
+- チューナー（`0xc0`）は、**1 バイトだけの書き込みを命令として受け取る**（初期化で送る `0xff` はリセット）。  
+  「読む位置」のつもりで 1 バイトを送ると、受信が止まる（その次の受信の初期化で元に戻る）。
+- 中継を開いて読むだけ（`[0xfe, 0xc1]` のあとリクエスト `0x19`）なら受信に影響はなく、何バイト読んでも `0xc8` が続く（状態を返すだけの形）。  
+  レジスタを読み返す手段は見つかっていない。
+
+## 2. 制御の手順
+
+### ファームの起動
+
 UT100B は通電直後は ASICEN のコールドブート状態（VID: `1738`, PID: `5211`）で認識されます。  
 ファームウェア（16 KB）を転送することで、ウォーム状態の `VidzMedia Quixun HDTV`（VID: `3275`, PID: `7020`）に再列挙されます。
 
-### ファームウェアの入手（付属 CD から）
+#### ファームウェアの入手（付属 CD から）
 ファームウェアは付属 CD の `Quixun_AS11Loader.sys`（Windows 用ローダー）の `.data` に、次の形で格納されています。
 
 - 16 KB のファームウェアが 2 つ。  
@@ -129,73 +129,39 @@ ut100b-firmware load asv5211-firmware.bin
 3 つとも `3275:7020` として出直し、内蔵 B-CAS（`--b25`）で ch19 を 60 秒受けて、TS の誤り・欠けはなく、全パケットのスクランブルが外れた（約 64〜66 万パケット、C/N 約 31〜32 dB）。  
 受信の結果に、ファームウェアの違いによる差は見られなかった。
 
----
+### ASV5211 の命令（PLEX の Linux ドライバーのライブラリから、2026-11-11）
 
-## 3. 内蔵 B-CAS スロットの制御 (ASICEN ASIE5606)
-外付けカードリーダー（SCR3310 等）を一切使わず、本体前面の内蔵カードスロットから B-CAS カードを直接制御できます。
+PLEX の `PX-SERIES_ver.1.0_Linux_Driver`（UT100B が使っているのと同じ ASV5211 のファーム）に入っている `libPlexLib_*.a` は関数名が残っており、ASV5211 の命令の意味がそのまま読める。
 
-`recfriio --hdp --b25` は、この内蔵スロットで復号する（`--pcsc` を付けると外付けのリーダー）。
-- `recfriior5/AsieCardReader.cpp` が ASIE5606 のレジスタの窓を通してカードと T=1 でやり取りし（ビットを逆にしたブロック、LRC、続きのある答えの受け取り）、arib25 の `B_CAS_CARD_TRANSPORT` として渡す。  
-  arib25 の `b_cas_card.c` は、PC/SC の代わりにこの口を使えるようにした（B-CAS の命令の組み立てと応答の読み取りは元のまま）。
-- 手順は coax（`internal/coaxd/smartcard/asie5606`）で調べられたものに従った。
-- 実機での確認（ch19）: 20 秒で全 223,885 パケットが復号され、欠けなし。  
-  ffmpeg で映像（MPEG-2 1440×1080）と音声（AAC）がデコードできた。
-- 1 回の APDU に 150〜250 ms ほどかかる（送り出しに 100 ms、答えを 50 ms ごとに見回る）。  
-  ECM の処理はメインのスレッドで行うが、受信は別のスレッドとリングバッファ（20 秒分）で続くので、欠けにはならない。
+| 命令 | PLEX の関数 | 備考 |
+|---|---|---|
+| `0x00` / `0x01` | GetIRData / SetIRMode | リモコン |
+| `0x02` / `0x03` | ReadI2CData / WriteI2CData | 1 レジスタの読み書き |
+| `0x04` / `0x05` / `0x09` | ChannelFilter の読み書き / ResetChannel | TS フィルター |
+| `0x06` / `0x07` | DSC（受信の開始・停止） | |
+| `0x08` / `0x10` / `0x11` | GPIO / GPIOEx の書き込み / GPIOEx の読み出し | |
+| `0x0a` | GetDevHighSpeed | USB が高速かの問い合わせ（設定ではない） |
+| `0x0c` | GetCusInfo | 基板の情報（58 バイト） |
+| `0x0d` / `0x0e` / `0x14` / `0x19` | I2C の溜め・送り / 止めない書き込み / 読み出し | |
+| `0x12` / `0x13` | RstEncChip / WriteEncReg | 暗号の IC（UT100B では使っていない） |
+| `0x17` / `0x18` | ReadSysCtrlData / WriteSysCtrlData | recfriio の `0x17` はアドレス 2 から 2 バイト読むだけ |
+| `0x1a` | GetDevRanKey | 守られた書き込みの使い捨ての値 |
 
-### 通信仕様
-- **アクセス方法**: ASV5211 経由の USB ベンダーリクエスト
-  - Read: `0x02`, `wValue = (reg << 8) | saddr`
-  - Write: `0x03`, `wValue = (reg << 8) | saddr`, `wIndex = val`
-  - スマートカードコントローラのスレーブアドレス: `saddr = 0x4a`
-- **ATR 取得シーケンス**:
-  - レジスタ `0x00 = 0x80` → `0x00` → `0x04 = 0x00` で初期化
-  - レジスタ `0x00 = 0x08` (Power ON) → `0x04 = 0x80` → `0x00 = 0x09` (Reset)
-  - レジスタ `0x03`/`0x39` で受信長取得後、`0x40` 以降から 13 バイトの ATR をビット反転（LSB-first）して取得
-  - 取得される標準 B-CAS ATR: `3B F0 12 00 FF 91 81 B1 7C 45 1F 03 99`
-- **APDU 送受信**:
-  - T=1 プロトコル準拠でコマンド送信後、カード ID（`90 30 00 00 00`）等を取得可能
+復調部（TC90522 の地上波側）について:
+- `0x1c`: PLEX は選局のときに読んで bit 4・5 を立て、少し待って bit 4 を落とす。  
+  元の recfriio は `0x9d` を読んだ値（いつも 0）から `0x1c` を作っていて、初期化の表で立てた bit 1 を消していた（`0x28`・`0x38`）。  
+  `0x1c` を読んで書き戻す形（`0x2a`・`0x3a`）に直した。  
+  9 チャンネルで両方を受け比べ、C/N・誤り・欠けに違いは無かった（2026-11-11）。
+- `0x1e`: PLEX は周波数（約 261 MHz の上下）で bit 4・5 を変える。  
+  出力の線の設定と見られる。  
+  `0x1f` は意味不明。
+- `0x9d`: PLEX は BER・SNR を測るときに最初に読む状態のレジスタ。
 
-（recfriio には内蔵 B-CAS リーダーを試す `tools/probe_bcas.c` がある。この Go 版には持ってきていない）
+GPIO の `0x11` は ASIE5606 のリセットで、PLEX の基板・coax と同じ。  
+`0xd4`・`0xd5`・`0x08` は基板ごとの配線で、PLEX の基板とは違うので分からない。
 
----
+### USB 転送の暗号（ASIE5606、2026-11-11 からの調べ）
 
-## 4. 3 チューナー同時録画品質比較結果
-PT3、torne（CECH-ZD1 J）、QRS-UT100B を同一タイミング・同一チャンネル（NHK総合 19ch / 30秒間）で同時受信したパケット品質評価結果です。
-
-```text
-================================================================================
- 📡 3-Tuner Simultaneous Recording Quality Comparison
-================================================================================
-Tuner          Size       Bitrate    Duration   SyncErr   TEI Err   CC Drop   Gaps   Judge
---------------------------------------------------------------------------------
-PT3            63.1 MB    17.3 Mbps  29.2s      0         0         0         0      ⭕ EXCELLENT
-torne          61.0 MB    17.3 Mbps  28.2s      0         0         0         0      ⭕ EXCELLENT
-QRS-UT100B     58.5 MB    15.5 Mbps  30.2s      0         0         0         0      ⭕ EXCELLENT
-================================================================================
-```
-- **SyncErr (同期エラー)**: 0
-- **TEI Err (RFエラー)**: 0
-- **CC Drop (パケット欠落)**: 0
-- **Gaps (タイムスタンプ途切れ)**: 0
-
-この 30 秒・1 回の比較では、3 台とも誤り・欠けはなかった。  
-UT100B のビットレートが低く見えるのは、TS フィルターでヌルパケット（PID `0x1fff`）を捨てているためで、ほかの PID の毎秒のパケット数は 3 台でほぼ同じだった（2026-11-11 に数え直した）。  
-長い受信での結果は上の「確かめた結果」にある。
-
----
-
-## 5. 将来の近代化計画 (Roadmap)
-- [x] **Go による書き直し**: このリポジトリ（recut100b、2026-11-11）。  
-  cgo・libusb・libpcsclite を使わない 1 つのバイナリ。
-- [ ] **coax への統合**: `Till0196/coax` に QRS-UT100B（`asv5211` + `asie5606`）のボードとして足す。  
-  このリポジトリの `internal/ut100b` と `testdata/usb-trace-hdp-ch19.txt` を元にする。
-- [ ] **Windows 版の現代化**:
-  - レガシーな未署名 .sys ドライバ（XP/Vista 時代）に依存せず、WinUSB 直結で Windows 11 等でも署名問題なく直挿し動作可能にする。
-
----
-
-## ASIE5606 の USB 転送の暗号（2026-11-11 の調べ）
 UT100B の TS は、復調器から ASIE5606 を通ってブリッジ（ASV5211）に届くとき、ASIE5606 で DES がかかる。  
 ソフト（`recfriior5/AsieStreamCipher.cpp`、Go 版は `internal/asie5606/stream_cipher.go`）で元に戻している。
 
@@ -235,41 +201,81 @@ UT100B の TS は、復調器から ASIE5606 を通ってブリッジ（ASV5211�
   DES の S 箱・置換は規格（FIPS 46-3）の値をそのまま書き、速さのための表と鍵スケジュールは、上の 2 つの鍵から起動時に組み立てる。  
   `make -C recfriior5 test` で、実機のヌルパケットと、置き換える前の `decrypt.c` の出力を答えに照合できる。
 
-## チューナー・復調部を読むだけで調べた結果（2026-11-11）
-- 復調部（`0x20`）は全レジスタを読める（`0x02`）。  
-  初期化で書いた値がそのまま読め、読み方が正しいことは確かめた。  
-  型番を示すレジスタは見つかっていない。
-- チューナー（`0xc0`）は、**1 バイトだけの書き込みを命令として受け取る**（初期化で送る `0xff` はリセット）。  
-  「読む位置」のつもりで 1 バイトを送ると、受信が止まる（その次の受信の初期化で元に戻る）。
-- 中継を開いて読むだけ（`[0xfe, 0xc1]` のあとリクエスト `0x19`）なら受信に影響はなく、何バイト読んでも `0xc8` が続く（状態を返すだけの形）。  
-  レジスタを読み返す手段は見つかっていない。
+## 3. B-CAS（内蔵スロット）
 
-## PLEX の Linux ドライバーのライブラリから分かったこと（2026-11-11）
-PLEX の `PX-SERIES_ver.1.0_Linux_Driver`（UT100B が使っているのと同じ ASV5211 のファーム）に入っている `libPlexLib_*.a` は関数名が残っており、ASV5211 の命令の意味がそのまま読める。
+外付けカードリーダー（SCR3310 等）を一切使わず、本体前面の内蔵カードスロットから B-CAS カードを直接制御できます。
 
-| 命令 | PLEX の関数 | 備考 |
-|---|---|---|
-| `0x00` / `0x01` | GetIRData / SetIRMode | リモコン |
-| `0x02` / `0x03` | ReadI2CData / WriteI2CData | 1 レジスタの読み書き |
-| `0x04` / `0x05` / `0x09` | ChannelFilter の読み書き / ResetChannel | TS フィルター |
-| `0x06` / `0x07` | DSC（受信の開始・停止） | |
-| `0x08` / `0x10` / `0x11` | GPIO / GPIOEx の書き込み / GPIOEx の読み出し | |
-| `0x0a` | GetDevHighSpeed | USB が高速かの問い合わせ（設定ではない） |
-| `0x0c` | GetCusInfo | 基板の情報（58 バイト） |
-| `0x0d` / `0x0e` / `0x14` / `0x19` | I2C の溜め・送り / 止めない書き込み / 読み出し | |
-| `0x12` / `0x13` | RstEncChip / WriteEncReg | 暗号の IC（UT100B では使っていない） |
-| `0x17` / `0x18` | ReadSysCtrlData / WriteSysCtrlData | recfriio の `0x17` はアドレス 2 から 2 バイト読むだけ |
-| `0x1a` | GetDevRanKey | 守られた書き込みの使い捨ての値 |
+`recfriio --hdp --b25` は、この内蔵スロットで復号する（`--pcsc` を付けると外付けのリーダー）。
+- `recfriior5/AsieCardReader.cpp` が ASIE5606 のレジスタの窓を通してカードと T=1 でやり取りし（ビットを逆にしたブロック、LRC、続きのある答えの受け取り）、arib25 の `B_CAS_CARD_TRANSPORT` として渡す。  
+  arib25 の `b_cas_card.c` は、PC/SC の代わりにこの口を使えるようにした（B-CAS の命令の組み立てと応答の読み取りは元のまま）。
+- 手順は coax（`internal/coaxd/smartcard/asie5606`）で調べられたものに従った。
+- 実機での確認（ch19）: 20 秒で全 223,885 パケットが復号され、欠けなし。  
+  ffmpeg で映像（MPEG-2 1440×1080）と音声（AAC）がデコードできた。
+- 1 回の APDU に 150〜250 ms ほどかかる（送り出しに 100 ms、答えを 50 ms ごとに見回る）。  
+  ECM の処理はメインのスレッドで行うが、受信は別のスレッドとリングバッファ（20 秒分）で続くので、欠けにはならない。
 
-復調部（TC90522 の地上波側）について:
-- `0x1c`: PLEX は選局のときに読んで bit 4・5 を立て、少し待って bit 4 を落とす。  
-  元の recfriio は `0x9d` を読んだ値（いつも 0）から `0x1c` を作っていて、初期化の表で立てた bit 1 を消していた（`0x28`・`0x38`）。  
-  `0x1c` を読んで書き戻す形（`0x2a`・`0x3a`）に直した。  
-  9 チャンネルで両方を受け比べ、C/N・誤り・欠けに違いは無かった（2026-11-11）。
-- `0x1e`: PLEX は周波数（約 261 MHz の上下）で bit 4・5 を変える。  
-  出力の線の設定と見られる。  
-  `0x1f` は意味不明。
-- `0x9d`: PLEX は BER・SNR を測るときに最初に読む状態のレジスタ。
+### 通信仕様
+- **アクセス方法**: ASV5211 経由の USB ベンダーリクエスト
+  - Read: `0x02`, `wValue = (reg << 8) | saddr`
+  - Write: `0x03`, `wValue = (reg << 8) | saddr`, `wIndex = val`
+  - スマートカードコントローラのスレーブアドレス: `saddr = 0x4a`
+- **ATR 取得シーケンス**:
+  - レジスタ `0x00 = 0x80` → `0x00` → `0x04 = 0x00` で初期化
+  - レジスタ `0x00 = 0x08` (Power ON) → `0x04 = 0x80` → `0x00 = 0x09` (Reset)
+  - レジスタ `0x03`/`0x39` で受信長取得後、`0x40` 以降から 13 バイトの ATR をビット反転（LSB-first）して取得
+  - 取得される標準 B-CAS ATR: `3B F0 12 00 FF 91 81 B1 7C 45 1F 03 99`
+- **APDU 送受信**:
+  - T=1 プロトコル準拠でコマンド送信後、カード ID（`90 30 00 00 00`）等を取得可能
 
-GPIO の `0x11` は ASIE5606 のリセットで、PLEX の基板・coax と同じ。  
-`0xd4`・`0xd5`・`0x08` は基板ごとの配線で、PLEX の基板とは違うので分からない。
+（recfriio には内蔵 B-CAS リーダーを試す `tools/probe_bcas.c` がある。この Go 版には持ってきていない）
+
+## 4. C++ 版との対応
+
+以下の調べものは C++ 版の recfriio を使っていたとき（タグ `cpp-final`）なので、文中のファイル名は C++ 版のものです。  
+いまの Go 版で同じことをしている場所は次のとおり。
+
+| C++ 版（`cpp-final`） | Go 版 |
+|---|---|
+| `recfriior5/Hdp.cpp`（初期化・選局・C/N・区切り合わせ） | `internal/ut100b/tuner.go`・`stream.go` |
+| `recfriior5/AsieStreamCipher.cpp`（以前の `AsieDescrambler.cpp`、`decrypt.c`） | `internal/asie5606/stream_cipher.go`（Go の `crypto/des`） |
+| `recfriior5/AsieCardReader.cpp` | `internal/asie5606/card.go` |
+| `arib25/`（B25・MULTI2・B-CAS の命令） | `internal/b25/`・`internal/multi2/`・`internal/bcas/` |
+| `tools/ut100b-firmware.py` | `cmd/ut100b-firmware`・`internal/firmware/` |
+| `RECFRIIO_USB_TRACE=1` | `RECFRIIO_USB_TRACE=1`（`RECUT100B_USB_TRACE=1` も使える） |
+| `make -C recfriior5 test` | `go test ./...` |
+| `recfriio --hdp --b25` | `recfriio --hdp --b25`（`recut100b --b25` と同じ） |
+
+## 5. 検証の記録
+
+### 3 チューナー同時録画の比較
+
+PT3、torne（CECH-ZD1 J）、QRS-UT100B を同一タイミング・同一チャンネル（NHK総合 19ch / 30秒間）で同時受信したパケット品質評価結果です。
+
+```text
+================================================================================
+ 📡 3-Tuner Simultaneous Recording Quality Comparison
+================================================================================
+Tuner          Size       Bitrate    Duration   SyncErr   TEI Err   CC Drop   Gaps   Judge
+--------------------------------------------------------------------------------
+PT3            63.1 MB    17.3 Mbps  29.2s      0         0         0         0      ⭕ EXCELLENT
+torne          61.0 MB    17.3 Mbps  28.2s      0         0         0         0      ⭕ EXCELLENT
+QRS-UT100B     58.5 MB    15.5 Mbps  30.2s      0         0         0         0      ⭕ EXCELLENT
+================================================================================
+```
+- **SyncErr (同期エラー)**: 0
+- **TEI Err (RFエラー)**: 0
+- **CC Drop (パケット欠落)**: 0
+- **Gaps (タイムスタンプ途切れ)**: 0
+
+この 30 秒・1 回の比較では、3 台とも誤り・欠けはなかった。  
+UT100B のビットレートが低く見えるのは、TS フィルターでヌルパケット（PID `0x1fff`）を捨てているためで、ほかの PID の毎秒のパケット数は 3 台でほぼ同じだった（2026-11-11 に数え直した）。  
+長い受信での結果は「Go 版での使い方」の「確かめた結果」にある。
+
+## 6. これから
+
+- [x] **Go による書き直し**: 2026-11-11 に recut100b として始め、2026-11-19 に C/C++ 版と置き換えた（`recfriio --hdp`）。  
+  cgo・libusb・libpcsclite を使わない 1 つのバイナリ。
+- [ ] **coax への統合**: `Till0196/coax` に QRS-UT100B（`asv5211` + `asie5606`）のボードとして足す。  
+  このリポジトリの `internal/ut100b` と `testdata/usb-trace-hdp-ch19.txt` を元にする。
+- [ ] **Windows 版の現代化**:
+  - レガシーな未署名 .sys ドライバ（XP/Vista 時代）に依存せず、WinUSB 直結で Windows 11 等でも署名問題なく直挿し動作可能にする。
