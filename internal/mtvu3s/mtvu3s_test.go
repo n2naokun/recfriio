@@ -26,6 +26,8 @@ func TestParseChannel(t *testing.T) {
 		{"BS23_2", BandBS, 1049480 + 11*38360, 0x4172},
 		{"CS2", BandCS, 1613000, 0x6020},
 		{"CS24", BandCS, 1613000 + 11*40000, 0x7180},
+		{"CS8", BandCS, 1613000 + 3*40000, 0x6080},
+		{"CS10", BandCS, 1613000 + 4*40000, 0x60a0},
 	}
 	for _, c := range cases {
 		got, err := ParseChannel(c.in)
@@ -165,6 +167,23 @@ func TestMatchTSID(t *testing.T) {
 		{0x6020, 0x6020, false}, // CS は登録年を無視しない
 		{0, 0, true},
 	}
+	for _, c := range cases {
+		if got, ok := MatchTSID(c.want, ids); got != c.got || ok != c.ok {
+			t.Errorf("MatchTSID(%#04x) = %#04x, %v; want %#04x, %v", c.want, got, ok, c.got, c.ok)
+		}
+	}
+	// CS はネットワークのビット（0x1000）だけを無視する（表の 0x7080 と、実際の 0x6080）
+	cs := []uint16{0x6080, 0xfff8}
+	cases = []struct {
+		want, got uint16
+		ok        bool
+	}{
+		{0x6080, 0x6080, true},
+		{0x7080, 0x6080, true},
+		{0x6280, 0x6280, false}, // 登録年のビットは無視しない
+		{0x60a0, 0x60a0, false},
+	}
+	ids = cs
 	for _, c := range cases {
 		if got, ok := MatchTSID(c.want, ids); got != c.got || ok != c.ok {
 			t.Errorf("MatchTSID(%#04x) = %#04x, %v; want %#04x, %v", c.want, got, ok, c.got, c.ok)

@@ -40,10 +40,11 @@ const (
 	csStepKHz  = 40000
 )
 
-// csTSIDs は 110 度 CS の各トランスポンダーの TSID（recgvmvp の internal/channel と同じ表）。
+// csTSIDs は 110 度 CS の各トランスポンダーの TSID。
+// 上の 4 ビットはネットワーク（0x6 と 0x7）で、CS8・CS10 は 0x6 の側にある（2026-11-20 にわやさんの指摘で直した。元の表は 0x7080・0x70a0）。
 // recfriio は CS で TSID を渡さず TMCC の最初のものを選んでいて、CS2 では 0xfff8 を選んでいた。
 var csTSIDs = map[int]uint16{
-	2: 0x6020, 4: 0x7040, 6: 0x7060, 8: 0x7080, 10: 0x70a0, 12: 0x70c0,
+	2: 0x6020, 4: 0x7040, 6: 0x7060, 8: 0x6080, 10: 0x60a0, 12: 0x70c0,
 	14: 0x70e0, 16: 0x7100, 18: 0x7120, 20: 0x7140, 22: 0x7160, 24: 0x7180,
 }
 
@@ -61,8 +62,13 @@ type Channel struct {
 // bsYearMask は BS の TSID のうち、登録年のビット。
 const bsYearMask = 0x0e00
 
+// csNetworkMask は CS の TSID のうち、ネットワーク（0x6 と 0x7）を分けるビット。
+// トランスポンダーがネットワークを移っても選べるように、表と合わなければここを無視して当てる。
+const csNetworkMask = 0x1000
+
 // MatchTSID は、want に当たる TSID を TMCC の一覧 ids から選ぶ。
-// 同じものがあればそれ、BS なら登録年のビットを無視して同じものを返す。どちらも無ければ ok が false。
+// 同じものがあればそれ、BS なら登録年のビット、CS ならネットワークのビットを無視して同じものを返す。
+// どれも無ければ ok が false。
 // want が 0 なら（TS を選ばない）、0 と true。
 func MatchTSID(want uint16, ids []uint16) (id uint16, ok bool) {
 	if want == 0 {
@@ -76,6 +82,13 @@ func MatchTSID(want uint16, ids []uint16) (id uint16, ok bool) {
 	if want&0xf000 == 0x4000 {
 		for _, id := range ids {
 			if id&0xf000 == 0x4000 && id&^bsYearMask == want&^bsYearMask {
+				return id, true
+			}
+		}
+	}
+	if want&0xe000 == 0x6000 {
+		for _, id := range ids {
+			if id&0xe000 == 0x6000 && id&^csNetworkMask == want&^csNetworkMask {
 				return id, true
 			}
 		}
